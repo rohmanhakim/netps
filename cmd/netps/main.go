@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
-	"netps/internal/parser"
+	uimodel "netps/ui/model"
+	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
-	res, err := parser.ScanListeningPortsProcfs()
-
-	if err != nil {
-		panic(err)
+	p := tea.NewProgram(uimodel.InitialModel())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
 	}
-
-	fmt.Printf("result: %v", res)
-
 }

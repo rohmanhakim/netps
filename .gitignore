@@ -1,2 +1,3 @@
 *.swp
 cmd/netps/main
+cmd/netps/netps

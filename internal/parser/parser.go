@@ -130,7 +130,7 @@ func mapInodeToPID() (map[uint64]int, error) {
 	return result, nil
 }
 
-func ScanListeningPortsProcfs() (map[int][]string, error) {
+func ScanListeningPortsProcfs() ([]model.Process, error) {
 	socketMaps := make(map[uint64]model.SocketInfo)
 
 	files := []struct {
@@ -155,13 +155,15 @@ func ScanListeningPortsProcfs() (map[int][]string, error) {
 		return nil, err
 	}
 
-	out := make(map[int][]string)
+	out := []model.Process{}
 	for inode, sock := range socketMaps {
 		if pid, ok := inodePID[inode]; ok {
-			out[pid] = append(
-				out[pid],
-				fmt.Sprintf("%s:%d/%s", sock.Addr, sock.Port, sock.Proto),
-			)
+			proc := model.Process{
+				Name:       "",
+				PID:        pid,
+				SocketInfo: sock,
+			}
+			out = append(out, proc)
 		}
 	}
 
