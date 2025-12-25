@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
-	uimodel "netps/ui/model"
 	"os"
+
+	uimodel "netps/ui/model"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
-	p := tea.NewProgram(uimodel.InitialModel())
+
+	p := tea.NewProgram(uimodel.Initialize())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
