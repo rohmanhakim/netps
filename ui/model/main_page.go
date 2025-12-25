@@ -45,7 +45,8 @@ func (m MainPage) View() string {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
 
-	return baseStyle.Render(m.table.View()) + "\n"
+	statusBar := "[↑↓] select · [Enter] inspect/filter · [q] quit"
+	return baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n"
 }
 
 func mapProcessItem() []table.Row {
