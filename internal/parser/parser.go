@@ -130,10 +130,45 @@ func mapInodeToPID() (map[uint64]int, error) {
 	return result, nil
 }
 
+func parseProcessName(pid int) (string, error) {
+	var sb strings.Builder
+
+	_, err := sb.WriteString("/proc/")
+	if err != nil {
+		return "", err
+	}
+	_, err = sb.WriteString(strconv.Itoa(pid))
+	if err != nil {
+		return "", err
+	}
+	_, err = sb.WriteString("/comm")
+	if err != nil {
+		return "", err
+	}
+
+	f, err := os.Open(sb.String())
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if !scanner.Scan() {
+		return "", nil
+	}
+	var name string
+
+	name = scanner.Text()
+
+	return name, nil
+}
+
 func ScanListeningPortsProcfs() ([]model.Process, error) {
 	socketMaps := make(map[uint64]model.SocketInfo)
 
-	files := []struct {
+	//procFile := "/proc/<pid>/comm"
+
+	procNetfiles := []struct {
 		path  string
 		proto string
 	}{
@@ -143,7 +178,7 @@ func ScanListeningPortsProcfs() ([]model.Process, error) {
 		{"/proc/net/udp6", "udp6"},
 	}
 
-	for _, f := range files {
+	for _, f := range procNetfiles {
 		m, err := parseProcNet(f.path, f.proto)
 		if err == nil {
 			maps.Copy(socketMaps, m)
@@ -158,8 +193,12 @@ func ScanListeningPortsProcfs() ([]model.Process, error) {
 	out := []model.Process{}
 	for inode, sock := range socketMaps {
 		if pid, ok := inodePID[inode]; ok {
+			name, err := parseProcessName(pid)
+			if err != nil {
+				panic(err)
+			}
 			proc := model.Process{
-				Name:       "",
+				Name:       name,
 				PID:        pid,
 				SocketInfo: sock,
 			}

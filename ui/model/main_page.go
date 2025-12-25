@@ -76,7 +76,7 @@ func mapProcessItem() []table.Row {
 func Initialize() tea.Model {
 	columns := []table.Column{
 		{Title: "PID", Width: 10},
-		{Title: "Name", Width: 10},
+		{Title: "Name", Width: 30},
 		{Title: "Ports", Width: 30},
 	}
 
