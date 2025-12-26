@@ -1,3 +1,4 @@
 *.swp
 cmd/netps/main
 cmd/netps/netps
+cmd/netps/__debug_bin*

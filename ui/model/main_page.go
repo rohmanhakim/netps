@@ -11,6 +11,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const HorizontalPadding = 1
+const VerticalPadding = 2
+const CellPadding = 2
+const FirstColumnWidth = 10
+
 type MainPage struct {
 	table table.Model
 }
@@ -20,6 +25,9 @@ func (m MainPage) Init() tea.Cmd { return nil }
 func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		updateTableSize(&m, msg.Width, msg.Height)
+		m.table.Focus()
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -31,11 +39,10 @@ func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			return m, tea.Batch(
-				tea.Printf("process %s selected!", m.table.SelectedRow()[0]),
-			)
+			return m, cmd
 		}
 	}
+
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
 }
@@ -74,11 +81,25 @@ func mapProcessItem() []table.Row {
 	return rows
 }
 
+func updateTableSize(m *MainPage, newWidth int, newHeight int) {
+	columnsCount := len(m.table.Columns())
+
+	m.table.SetWidth(newWidth - (HorizontalPadding * 2))
+	m.table.SetHeight(newHeight - (VerticalPadding * 2))
+
+	resizedColumnWidth := m.table.Width() - (columnsCount * CellPadding) - FirstColumnWidth
+	nameColumnWidth := resizedColumnWidth / 2
+	portColumnWidth := resizedColumnWidth - nameColumnWidth
+
+	m.table.Columns()[1].Width = nameColumnWidth
+	m.table.Columns()[2].Width = portColumnWidth
+}
+
 func Initialize() tea.Model {
 	columns := []table.Column{
 		{Title: "PID", Width: 10},
-		{Title: "Name", Width: 30},
-		{Title: "Ports", Width: 30},
+		{Title: "Name", Width: 33},
+		{Title: "Socket Info", Width: 33},
 	}
 
 	rows := mapProcessItem()
@@ -87,7 +108,6 @@ func Initialize() tea.Model {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(7),
 	)
 
 	s := table.DefaultStyles()
