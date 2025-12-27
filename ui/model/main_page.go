@@ -3,12 +3,14 @@ package model
 import (
 	"fmt"
 	"netps/internal/parser"
+	"os"
 	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
 )
 
 const HorizontalPadding = 1
@@ -24,10 +26,10 @@ func (m MainPage) Init() tea.Cmd { return nil }
 
 func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		updateTableSize(&m, msg.Width, msg.Height)
-		m.table.Focus()
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -39,7 +41,11 @@ func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			return m, cmd
+			pid, err := strconv.Atoi(m.table.SelectedRow()[0])
+			if err != nil {
+				panic(err)
+			}
+			return ProcessDetails{PID: pid}, cmd
 		}
 	}
 
@@ -51,8 +57,20 @@ func (m MainPage) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
+	w, h, err := term.GetSize(uintptr(os.Stdout.Fd()))
 
-	statusBar := "[↑↓] select · [Enter] inspect · [q] quit · [s] sort · [f] filter"
+	footerStyle := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#FFFFFF"))
+
+	statusBar := footerStyle.Render("[↑↓] select · [Enter] inspect · [q] quit · [s] sort · [f] filter")
+	newHeight := h - lipgloss.Height(statusBar)
+	if err == nil {
+		updateTableSize(&m, w, newHeight)
+		baseStyle = baseStyle.Height(newHeight).Width(w)
+	}
+
+	m.table.Focus()
 
 	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n")
 	v.AltScreen = true
@@ -99,7 +117,7 @@ func updateTableSize(m *MainPage, newWidth int, newHeight int) {
 	m.table.Columns()[2].Width = portColumnWidth
 }
 
-func Initialize() tea.Model {
+func (m MainPage) Initialize() tea.Model {
 	columns := []table.Column{
 		{Title: "PID", Width: 10},
 		{Title: "Name", Width: 33},
@@ -125,6 +143,6 @@ func Initialize() tea.Model {
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
-	m := MainPage{t}
-	return m
+
+	return MainPage{t}
 }
