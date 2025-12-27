@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const HorizontalPadding = 1
@@ -47,13 +47,17 @@ func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m MainPage) View() string {
+func (m MainPage) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
 
-	statusBar := "[↑↓] select · [Enter] inspect/filter · [q] quit"
-	return baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n"
+	statusBar := "[↑↓] select · [Enter] inspect · [q] quit · [s] sort · [f] filter"
+
+	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n")
+	v.AltScreen = true
+
+	return v
 }
 
 func mapProcessItem() []table.Row {
