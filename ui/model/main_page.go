@@ -89,14 +89,19 @@ func mapProcessItem() []table.Row {
 	for _, p := range processes {
 		var sb strings.Builder
 
-		_, err := fmt.Fprintf(&sb, "%s:%d/%s", p.SocketInfo.Addr, p.SocketInfo.Port, p.SocketInfo.Proto)
+		aggregated := p.Detail.AggregateSockets()
+		_, err := fmt.Fprintf(&sb, "%dL %dE %dC", aggregated["L"], aggregated["E"], aggregated["C"])
 		if err != nil {
 			panic(err)
 		}
+
+		filteredPorts := p.Detail.FilterListenPorts()
+		joinedPorts := strings.Join(filteredPorts, ", ")
 		r := table.Row{
 			strconv.Itoa(p.PID),
-			p.Name,
+			p.Detail.Name,
 			sb.String(),
+			joinedPorts,
 		}
 		rows = append(rows, r)
 	}
@@ -106,22 +111,24 @@ func mapProcessItem() []table.Row {
 func updateTableSize(m *MainPage, newWidth int, newHeight int) {
 	columnsCount := len(m.table.Columns())
 
-	m.table.SetWidth(newWidth - (HorizontalPadding * 2))
+	newTableWidth := newWidth - (HorizontalPadding * 10)
+	m.table.SetWidth(newTableWidth)
 	m.table.SetHeight(newHeight - (VerticalPadding * 2))
 
-	resizedColumnWidth := m.table.Width() - (columnsCount * CellPadding) - FirstColumnWidth
-	nameColumnWidth := resizedColumnWidth / 2
-	portColumnWidth := resizedColumnWidth - nameColumnWidth
-
-	m.table.Columns()[1].Width = nameColumnWidth
-	m.table.Columns()[2].Width = portColumnWidth
+	avgColWidth := newTableWidth / (columnsCount)
+	firstColumnWidth := newTableWidth - ((columnsCount - 1) * avgColWidth)
+	m.table.Columns()[0].Width = firstColumnWidth
+	for i := 1; i < columnsCount; i++ {
+		m.table.Columns()[i].Width = avgColWidth
+	}
 }
 
 func (m MainPage) Initialize() tea.Model {
 	columns := []table.Column{
-		{Title: "PID", Width: 10},
-		{Title: "Name", Width: 33},
-		{Title: "Socket Info", Width: 33},
+		{Title: "PID"},
+		{Title: "NAME"},
+		{Title: "SOCKS"},
+		{Title: "L.PORTS"},
 	}
 
 	rows := mapProcessItem()

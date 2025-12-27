@@ -12,6 +12,37 @@ import (
 	"strings"
 )
 
+func parseState(state string) string {
+	switch state {
+	case "01":
+		return "ESTABLISHED"
+	case "02":
+		return "SYN_SENT"
+	case "03":
+		return "SYN_RECV"
+	case "04":
+		return "FIN_WAIT1"
+	case "05":
+		return "FIN_WAIT2"
+	case "06":
+		return "TIME_WAIT"
+	case "07":
+		return "CLOSE"
+	case "08":
+		return "CLOSE_WAIT"
+	case "09":
+		return "LAST_ACK"
+	case "0A":
+		return "LISTEN"
+	case "0B":
+		return "CLOSING"
+	case "0C":
+		return "NEW_SYN_RECV"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func parseProcNet(path string, proto string) (map[uint64]model.SocketInfo, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -30,10 +61,7 @@ func parseProcNet(path string, proto string) (map[uint64]model.SocketInfo, error
 		if len(fields) < 10 {
 			continue
 		}
-		state := fields[3]
-		if state != "0A" {
-			continue
-		}
+		state := parseState(fields[3])
 		addr, port, err := parseHexAddr(fields[1])
 		if err != nil {
 			continue
@@ -48,6 +76,7 @@ func parseProcNet(path string, proto string) (map[uint64]model.SocketInfo, error
 			Proto: proto,
 			Addr:  addr,
 			Port:  port,
+			State: state,
 		}
 	}
 
@@ -163,10 +192,8 @@ func parseProcessName(pid int) (string, error) {
 	return name, nil
 }
 
-func ScanListeningPortsProcfs() ([]model.Process, error) {
+func ScanListeningPortsProcfs() ([]*model.Process, error) {
 	socketMaps := make(map[uint64]model.SocketInfo)
-
-	//procFile := "/proc/<pid>/comm"
 
 	procNetfiles := []struct {
 		path  string
@@ -190,20 +217,22 @@ func ScanListeningPortsProcfs() ([]model.Process, error) {
 		return nil, err
 	}
 
-	out := []model.Process{}
+	out := []*model.Process{}
+	procMap := make(map[int][]model.SocketInfo)
 	for inode, sock := range socketMaps {
 		if pid, ok := inodePID[inode]; ok {
-			name, err := parseProcessName(pid)
-			if err != nil {
-				panic(err)
-			}
-			proc := model.Process{
-				Name:       name,
-				PID:        pid,
-				SocketInfo: sock,
-			}
-			out = append(out, proc)
+			procMap[pid] = append(procMap[pid], sock)
 		}
+	}
+
+	for pid, sockets := range procMap {
+		name, err := parseProcessName(pid)
+		if err != nil {
+			panic(err)
+		}
+		proc := model.NewProcess(pid, name)
+		proc.Detail.Sockets = sockets
+		out = append(out, proc)
 	}
 
 	return out, nil
