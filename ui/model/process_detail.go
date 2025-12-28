@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"netps/internal/parser"
 	"os"
 	"strconv"
 
@@ -11,35 +12,40 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-type ProcessDetail struct {
-	Name          string
+type ProcessDetailScreen struct {
 	PID           int
-	ExecPath      string
-	Command       string
-	Parent        int
+	Name          string
+	ExePath       string
 	width, height int
 }
 
-func (m ProcessDetail) Init() tea.Cmd { return nil }
+type processDetailHydratedMsg struct {
+	ExePath string
+	Err     error
+}
 
-func (m ProcessDetail) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (pds ProcessDetailScreen) Init() tea.Cmd { return nil }
+
+func (pds ProcessDetailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		pds.width = msg.Width
+		pds.height = msg.Height
+	case processDetailHydratedMsg:
+		pds.ExePath = msg.ExePath
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
 			return MainPage{}.Initialize(), cmd
 		case "q", "ctrl+c":
-			return m, tea.Quit
+			return pds, tea.Quit
 		}
 	}
-	return m, cmd
+	return pds, cmd
 }
 
-func (m ProcessDetail) View() tea.View {
+func (pds ProcessDetailScreen) View() tea.View {
 
 	base := lipgloss.NewStyle().Foreground(lipgloss.Color("#EEEEEE"))
 	subtle := lipgloss.Color("#383838")
@@ -72,9 +78,10 @@ func (m ProcessDetail) View() tea.View {
 
 	processCommand := `rsync -avz --delete --partial --progress --bwlimit=5000 --compress-level=9 --exclude='.git' --exclude='node_modules' --exclude='*.log' -e "ssh -o StrictHostKeyChecking=no -o Compression=yes -c aes256-gcm@openssh.com" /local/project/ user@remote:/var/www/project/ `
 	processTable := table.New().Border(lipgloss.HiddenBorder()).Wrap(true)
-	processTable.Row(grayText("Name"), whiteText("dlv"))
-	processTable.Row(grayText("PID"), whiteText(strconv.Itoa(123)))
-	processTable.Row(grayText("Exec Path"), whiteText("/usr/bin/dlv"))
+	processTable.Row(grayText("Name"), whiteText(pds.Name))
+	processTable.Row(grayText("PID"), whiteText(strconv.Itoa(pds.PID)))
+	processTable.Row(grayText("Exec Path"), whiteText(pds.ExePath))
+
 	processTable.Row(grayText("Parent"), whiteText("go"))
 
 	commandSection := sectionContainer.Render(
@@ -149,14 +156,14 @@ func (m ProcessDetail) View() tea.View {
 	w, h, err := term.GetSize(uintptr(os.Stdout.Fd()))
 
 	if err == nil {
-		m.width = w
-		m.height = h
+		pds.width = w
+		pds.height = h
 	}
 
-	contentHeight := m.height - lipgloss.Height(footerStyle("placeholder")) - base.GetVerticalFrameSize()
+	contentHeight := pds.height - lipgloss.Height(footerStyle("placeholder")) - base.GetVerticalFrameSize()
 	ui := lipgloss.NewStyle().
 		Height(contentHeight).
-		Width(m.width - base.GetHorizontalFrameSize()).
+		Width(pds.width - base.GetHorizontalFrameSize()).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Left, processTable.Render(), commandSection, secondSection),
 		)
@@ -165,4 +172,14 @@ func (m ProcessDetail) View() tea.View {
 	v.AltScreen = true
 
 	return v
+}
+
+func hydrateStaticIds(pid int) tea.Cmd {
+	return func() tea.Msg {
+		exePath, err := parser.ParseProcExe(pid)
+		return processDetailHydratedMsg{
+			ExePath: exePath,
+			Err:     err,
+		}
+	}
 }

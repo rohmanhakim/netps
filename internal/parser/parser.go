@@ -192,6 +192,24 @@ func parseProcessName(pid int) (string, error) {
 	return name, nil
 }
 
+func ParseProcExe(pid int) (string, error) {
+	exePath, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
+	if err != nil {
+		panic(err)
+	}
+
+	return exePath, nil
+}
+
+func ParseProcCmdline(pid int) (string, error) {
+	exePath, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
+	if err != nil {
+		panic(err)
+	}
+
+	return exePath, nil
+}
+
 func ScanListeningPortsProcfs() ([]*model.Process, error) {
 	socketMaps := make(map[uint64]model.SocketInfo)
 

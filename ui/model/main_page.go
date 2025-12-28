@@ -45,7 +45,12 @@ func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				panic(err)
 			}
-			return ProcessDetail{PID: pid}, cmd
+
+			return ProcessDetailScreen{
+				PID:  pid,
+				Name: m.table.SelectedRow()[1],
+			}, hydrateStaticIds(pid)
+
 		}
 	}
 
