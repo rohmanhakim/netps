@@ -45,7 +45,7 @@ func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				panic(err)
 			}
-			return ProcessDetails{PID: pid}, cmd
+			return ProcessDetail{PID: pid}, cmd
 		}
 	}
 

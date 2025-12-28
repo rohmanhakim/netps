@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-type ProcessDetails struct {
+type ProcessDetail struct {
 	Name          string
 	PID           int
 	ExecPath      string
@@ -20,9 +20,9 @@ type ProcessDetails struct {
 	width, height int
 }
 
-func (m ProcessDetails) Init() tea.Cmd { return nil }
+func (m ProcessDetail) Init() tea.Cmd { return nil }
 
-func (m ProcessDetails) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m ProcessDetail) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -39,7 +39,7 @@ func (m ProcessDetails) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m ProcessDetails) View() tea.View {
+func (m ProcessDetail) View() tea.View {
 
 	base := lipgloss.NewStyle().Foreground(lipgloss.Color("#EEEEEE"))
 	subtle := lipgloss.Color("#383838")
