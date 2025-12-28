@@ -160,6 +160,14 @@ func mapInodeToPID() (map[uint64]int, error) {
 }
 
 func parseProcessName(pid int) (string, error) {
+	return parseSingleLineProcFd(pid, "comm")
+}
+
+func ParseCmdLine(pid int) (string, error) {
+	return parseSingleLineProcFd(pid, "cmdline")
+}
+
+func parseSingleLineProcFd(pid int, fdname string) (string, error) {
 	var sb strings.Builder
 
 	_, err := sb.WriteString("/proc/")
@@ -170,7 +178,7 @@ func parseProcessName(pid int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = sb.WriteString("/comm")
+	_, err = sb.WriteString("/" + fdname)
 	if err != nil {
 		return "", err
 	}

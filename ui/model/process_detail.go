@@ -16,11 +16,13 @@ type ProcessDetailScreen struct {
 	PID           int
 	Name          string
 	ExePath       string
+	CmdLine       string
 	width, height int
 }
 
 type processDetailHydratedMsg struct {
 	ExePath string
+	CmdLine string
 	Err     error
 }
 
@@ -34,6 +36,7 @@ func (pds ProcessDetailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		pds.height = msg.Height
 	case processDetailHydratedMsg:
 		pds.ExePath = msg.ExePath
+		pds.CmdLine = msg.CmdLine
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -76,7 +79,6 @@ func (pds ProcessDetailScreen) View() tea.View {
 		return bullet + grayText(s)
 	}
 
-	processCommand := `rsync -avz --delete --partial --progress --bwlimit=5000 --compress-level=9 --exclude='.git' --exclude='node_modules' --exclude='*.log' -e "ssh -o StrictHostKeyChecking=no -o Compression=yes -c aes256-gcm@openssh.com" /local/project/ user@remote:/var/www/project/ `
 	processTable := table.New().Border(lipgloss.HiddenBorder()).Wrap(true)
 	processTable.Row(grayText("Name"), whiteText(pds.Name))
 	processTable.Row(grayText("PID"), whiteText(strconv.Itoa(pds.PID)))
@@ -88,7 +90,7 @@ func (pds ProcessDetailScreen) View() tea.View {
 		lipgloss.JoinVertical(
 			lipgloss.Left,
 			sectionHeader("Command"),
-			grayText(processCommand),
+			grayText(pds.CmdLine),
 		),
 	)
 
@@ -177,8 +179,10 @@ func (pds ProcessDetailScreen) View() tea.View {
 func hydrateStaticIds(pid int) tea.Cmd {
 	return func() tea.Msg {
 		exePath, err := parser.ParseProcExe(pid)
+		cmdLine, err := parser.ParseCmdLine(pid)
 		return processDetailHydratedMsg{
 			ExePath: exePath,
+			CmdLine: cmdLine,
 			Err:     err,
 		}
 	}
