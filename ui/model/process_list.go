@@ -18,13 +18,13 @@ const VerticalPadding = 2
 const CellPadding = 2
 const FirstColumnWidth = 10
 
-type MainPage struct {
+type ProcessListScreen struct {
 	table table.Model
 }
 
-func (m MainPage) Init() tea.Cmd { return nil }
+func (m ProcessListScreen) Init() tea.Cmd { return nil }
 
-func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m ProcessListScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -58,7 +58,7 @@ func (m MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m MainPage) View() tea.View {
+func (m ProcessListScreen) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
@@ -113,7 +113,7 @@ func mapProcessItem() []table.Row {
 	return rows
 }
 
-func updateTableSize(m *MainPage, newWidth int, newHeight int) {
+func updateTableSize(m *ProcessListScreen, newWidth int, newHeight int) {
 	columnsCount := len(m.table.Columns())
 
 	newTableWidth := newWidth - (HorizontalPadding * 10)
@@ -128,7 +128,7 @@ func updateTableSize(m *MainPage, newWidth int, newHeight int) {
 	}
 }
 
-func (m MainPage) Initialize() tea.Model {
+func (m ProcessListScreen) Initialize() tea.Model {
 	columns := []table.Column{
 		{Title: "PID"},
 		{Title: "NAME"},
@@ -156,5 +156,5 @@ func (m MainPage) Initialize() tea.Model {
 		Bold(false)
 	t.SetStyles(s)
 
-	return MainPage{t}
+	return ProcessListScreen{t}
 }

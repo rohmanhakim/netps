@@ -37,7 +37,7 @@ func (pds ProcessDetailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			return MainPage{}.Initialize(), cmd
+			return ProcessListScreen{}.Initialize(), cmd
 		case "q", "ctrl+c":
 			return pds, tea.Quit
 		}
