@@ -20,13 +20,17 @@ type Model struct {
 	Name          string
 	ExecPath      string
 	Command       string
+	PPID          int
+	ParentName    string
 	width, height int
 }
 
 type detailHydratedMsg struct {
-	ExecPath string
-	Command  string
-	Err      error
+	ExecPath   string
+	Command    string
+	PPID       int
+	ParentName string
+	Err        error
 }
 
 func New() Model {
@@ -44,6 +48,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case detailHydratedMsg:
 		m.ExecPath = msg.ExecPath
 		m.Command = msg.Command
+		m.PPID = msg.PPID
+		m.ParentName = msg.ParentName
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -93,7 +99,8 @@ func (m Model) View() tea.View {
 	processTable.Row(grayText("PID"), whiteText(strconv.Itoa(m.PID)))
 	processTable.Row(grayText("Exec Path"), whiteText(m.ExecPath))
 
-	processTable.Row(grayText("Parent"), whiteText("go"))
+	parentInfo := fmt.Sprintf("%s (%d)", m.ParentName, m.PPID)
+	processTable.Row(grayText("Parent"), whiteText(parentInfo))
 
 	commandSection := sectionContainer.Render(
 		lipgloss.JoinVertical(
@@ -194,9 +201,11 @@ func HydrateStaticIds(pid int) tea.Cmd {
 			panic(err)
 		}
 		return detailHydratedMsg{
-			ExecPath: processDetail.ExecPath,
-			Command:  processDetail.Command,
-			Err:      err,
+			ExecPath:   processDetail.ExecPath,
+			Command:    processDetail.Command,
+			PPID:       processDetail.PPID,
+			ParentName: processDetail.ParentName,
+			Err:        err,
 		}
 	}
 }

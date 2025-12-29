@@ -7,6 +7,7 @@ import (
 	"netps/internal/procfs/comm"
 	"netps/internal/procfs/exe"
 	"netps/internal/procfs/net"
+	"netps/internal/procfs/stat"
 )
 
 type Client struct{}
@@ -42,9 +43,24 @@ func (p *Client) Detail(ctx context.Context, pid int) (process.ProcessDetail, er
 	if err != nil {
 		return process.ProcessDetail{}, err
 	}
-	detail := process.ProcessDetail{
-		ExecPath: execPath,
-		Command:  command,
+
+	processStat, err := stat.ParseStat(pid)
+	if err != nil {
+		return process.ProcessDetail{}, nil
 	}
+	ppid := processStat.PPID
+
+	parentName, err := comm.ParseProcessName(ppid)
+	if err != nil {
+		return process.ProcessDetail{}, nil
+	}
+
+	detail := process.ProcessDetail{
+		ExecPath:   execPath,
+		Command:    command,
+		PPID:       ppid,
+		ParentName: parentName,
+	}
+
 	return detail, nil
 }
