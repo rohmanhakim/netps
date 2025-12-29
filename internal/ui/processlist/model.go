@@ -1,8 +1,12 @@
-package model
+package processlist
 
 import (
+	"context"
 	"fmt"
-	"netps/internal/parser"
+	"netps/internal/process"
+	"netps/internal/procfs"
+	"netps/internal/ui/message"
+
 	"os"
 	"strconv"
 	"strings"
@@ -18,13 +22,18 @@ const VerticalPadding = 2
 const CellPadding = 2
 const FirstColumnWidth = 10
 
-type ProcessListScreen struct {
-	table table.Model
+type Model struct {
+	processSummaries []process.ProcessSummary
+	table            table.Model
 }
 
-func (m ProcessListScreen) Init() tea.Cmd { return nil }
+func New() Model {
+	return initializeProcessListScreen()
+}
 
-func (m ProcessListScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Init() tea.Cmd { return nil }
+
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -45,11 +54,17 @@ func (m ProcessListScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				panic(err)
 			}
+			return m, func() tea.Msg {
+				return message.GoToProcessDetail{
+					PID:  pid,
+					Name: m.table.SelectedRow()[1],
+				}
+			}
 
-			return ProcessDetailScreen{
-				PID:  pid,
-				Name: m.table.SelectedRow()[1],
-			}, hydrateStaticIds(pid)
+			// return processdetail.ProcessDetailScreen{
+			// 	PID:  pid,
+			// 	Name: m.table.SelectedRow()[1],
+			// }, processdetail.HydrateStaticIds(pid)
 
 		}
 	}
@@ -58,7 +73,7 @@ func (m ProcessListScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m ProcessListScreen) View() tea.View {
+func (m Model) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
@@ -83,37 +98,28 @@ func (m ProcessListScreen) View() tea.View {
 	return v
 }
 
-func mapProcessItem() []table.Row {
-	processes, err := parser.ScanListeningPortsProcfs()
-
-	if err != nil {
-		panic(err)
-	}
-
+func mapProcessItem(processSummaries []process.ProcessSummary) []table.Row {
 	var rows []table.Row
-	for _, p := range processes {
+	for _, p := range processSummaries {
 		var sb strings.Builder
 
-		aggregated := p.Detail.AggregateSockets()
-		_, err := fmt.Fprintf(&sb, "%dL %dE %dC", aggregated["L"], aggregated["E"], aggregated["C"])
+		_, err := fmt.Fprintf(&sb, "%dL %dE %dC", p.LSocketCount, p.ESocketCount, p.CSocketCount)
 		if err != nil {
 			panic(err)
 		}
 
-		filteredPorts := p.Detail.FilterListenPorts()
-		joinedPorts := strings.Join(filteredPorts, ", ")
 		r := table.Row{
 			strconv.Itoa(p.PID),
-			p.Detail.Name,
+			p.Name,
 			sb.String(),
-			joinedPorts,
+			p.LPortsText,
 		}
 		rows = append(rows, r)
 	}
 	return rows
 }
 
-func updateTableSize(m *ProcessListScreen, newWidth int, newHeight int) {
+func updateTableSize(m *Model, newWidth int, newHeight int) {
 	columnsCount := len(m.table.Columns())
 
 	newTableWidth := newWidth - (HorizontalPadding * 10)
@@ -128,7 +134,16 @@ func updateTableSize(m *ProcessListScreen, newWidth int, newHeight int) {
 	}
 }
 
-func (m ProcessListScreen) Initialize() tea.Model {
+func initializeProcessListScreen() Model {
+
+	client := procfs.NewClient()
+	service := process.NewService(client, client)
+	processSummaries, err := service.GetRunningSummaries(context.Background())
+
+	if err != nil {
+		panic(err)
+	}
+
 	columns := []table.Column{
 		{Title: "PID"},
 		{Title: "NAME"},
@@ -136,7 +151,7 @@ func (m ProcessListScreen) Initialize() tea.Model {
 		{Title: "L.PORTS"},
 	}
 
-	rows := mapProcessItem()
+	rows := mapProcessItem(processSummaries)
 
 	t := table.New(
 		table.WithColumns(columns),
@@ -156,5 +171,8 @@ func (m ProcessListScreen) Initialize() tea.Model {
 		Bold(false)
 	t.SetStyles(s)
 
-	return ProcessListScreen{t}
+	return Model{
+		processSummaries: processSummaries,
+		table:            t,
+	}
 }

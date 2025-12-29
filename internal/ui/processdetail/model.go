@@ -1,8 +1,11 @@
-package model
+package processdetail
 
 import (
+	"context"
 	"fmt"
-	"netps/internal/parser"
+	"netps/internal/process"
+	"netps/internal/procfs"
+	"netps/internal/ui/message"
 	"os"
 	"strconv"
 
@@ -12,43 +15,49 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-type ProcessDetailScreen struct {
+type Model struct {
 	PID           int
 	Name          string
-	ExePath       string
-	CmdLine       string
+	ExecPath      string
+	Command       string
 	width, height int
 }
 
-type processDetailHydratedMsg struct {
-	ExePath string
-	CmdLine string
-	Err     error
+type detailHydratedMsg struct {
+	ExecPath string
+	Command  string
+	Err      error
 }
 
-func (pds ProcessDetailScreen) Init() tea.Cmd { return nil }
+func New() Model {
+	return Model{}
+}
 
-func (pds ProcessDetailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Init() tea.Cmd { return nil }
+
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		pds.width = msg.Width
-		pds.height = msg.Height
-	case processDetailHydratedMsg:
-		pds.ExePath = msg.ExePath
-		pds.CmdLine = msg.CmdLine
+		m.width = msg.Width
+		m.height = msg.Height
+	case detailHydratedMsg:
+		m.ExecPath = msg.ExecPath
+		m.Command = msg.Command
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			return ProcessListScreen{}.Initialize(), cmd
+			return m, func() tea.Msg {
+				return message.GoBack{}
+			}
 		case "q", "ctrl+c":
-			return pds, tea.Quit
+			return m, tea.Quit
 		}
 	}
-	return pds, cmd
+	return m, cmd
 }
 
-func (pds ProcessDetailScreen) View() tea.View {
+func (m Model) View() tea.View {
 
 	base := lipgloss.NewStyle().Foreground(lipgloss.Color("#EEEEEE"))
 	subtle := lipgloss.Color("#383838")
@@ -80,9 +89,9 @@ func (pds ProcessDetailScreen) View() tea.View {
 	}
 
 	processTable := table.New().Border(lipgloss.HiddenBorder()).Wrap(true)
-	processTable.Row(grayText("Name"), whiteText(pds.Name))
-	processTable.Row(grayText("PID"), whiteText(strconv.Itoa(pds.PID)))
-	processTable.Row(grayText("Exec Path"), whiteText(pds.ExePath))
+	processTable.Row(grayText("Name"), whiteText(m.Name))
+	processTable.Row(grayText("PID"), whiteText(strconv.Itoa(m.PID)))
+	processTable.Row(grayText("Exec Path"), whiteText(m.ExecPath))
 
 	processTable.Row(grayText("Parent"), whiteText("go"))
 
@@ -90,7 +99,7 @@ func (pds ProcessDetailScreen) View() tea.View {
 		lipgloss.JoinVertical(
 			lipgloss.Left,
 			sectionHeader("Command"),
-			grayText(pds.CmdLine),
+			grayText(m.Command),
 		),
 	)
 
@@ -158,14 +167,14 @@ func (pds ProcessDetailScreen) View() tea.View {
 	w, h, err := term.GetSize(uintptr(os.Stdout.Fd()))
 
 	if err == nil {
-		pds.width = w
-		pds.height = h
+		m.width = w
+		m.height = h
 	}
 
-	contentHeight := pds.height - lipgloss.Height(footerStyle("placeholder")) - base.GetVerticalFrameSize()
+	contentHeight := m.height - lipgloss.Height(footerStyle("placeholder")) - base.GetVerticalFrameSize()
 	ui := lipgloss.NewStyle().
 		Height(contentHeight).
-		Width(pds.width - base.GetHorizontalFrameSize()).
+		Width(m.width - base.GetHorizontalFrameSize()).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Left, processTable.Render(), commandSection, secondSection),
 		)
@@ -176,14 +185,18 @@ func (pds ProcessDetailScreen) View() tea.View {
 	return v
 }
 
-func hydrateStaticIds(pid int) tea.Cmd {
+func HydrateStaticIds(pid int) tea.Cmd {
 	return func() tea.Msg {
-		exePath, err := parser.ParseProcExe(pid)
-		cmdLine, err := parser.ParseCmdLine(pid)
-		return processDetailHydratedMsg{
-			ExePath: exePath,
-			CmdLine: cmdLine,
-			Err:     err,
+		client := procfs.NewClient()
+		service := process.NewService(client, client)
+		processDetail, err := service.GetProcessDetail(context.Background(), pid)
+		if err != nil {
+			panic(err)
+		}
+		return detailHydratedMsg{
+			ExecPath: processDetail.ExecPath,
+			Command:  processDetail.Command,
+			Err:      err,
 		}
 	}
 }
