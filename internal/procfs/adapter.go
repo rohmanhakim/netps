@@ -64,3 +64,19 @@ func (p *Client) Detail(ctx context.Context, pid int) (process.ProcessDetail, er
 
 	return detail, nil
 }
+
+func (p *Client) Resource(ctx context.Context, pid int) (process.ProcessResource, error) {
+	processStat, err := stat.ParseStat(pid)
+	if err != nil {
+		return process.ProcessResource{}, err
+	}
+
+	resource := process.ProcessResource{
+		ResidentSetSizePage:    processStat.RSS,
+		StartTimeTick:          processStat.StartTime,
+		VirtualMemorySize:      processStat.VSize,
+		UserCPUTimeClockTick:   processStat.UTime,
+		SystemCPUTimeClockTick: processStat.STime,
+	}
+	return resource, nil
+}

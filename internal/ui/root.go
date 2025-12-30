@@ -40,7 +40,10 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Name: msg.Name,
 		}
 		m.screen = ScreenProcessDetail
-		return m, processdetail.HydrateStaticIds(msg.PID)
+		return m, tea.Batch(
+			processdetail.HydrateStaticIds(msg.PID),
+			processdetail.HydrateResource(msg.PID),
+		)
 
 	case message.GoBack:
 		m.screen = ScreenProcessList

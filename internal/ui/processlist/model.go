@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"netps/internal/process"
 	"netps/internal/procfs"
+	"netps/internal/sysconf"
 	"netps/internal/ui/message"
 
 	"os"
@@ -60,12 +61,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					Name: m.table.SelectedRow()[1],
 				}
 			}
-
-			// return processdetail.ProcessDetailScreen{
-			// 	PID:  pid,
-			// 	Name: m.table.SelectedRow()[1],
-			// }, processdetail.HydrateStaticIds(pid)
-
 		}
 	}
 
@@ -136,8 +131,10 @@ func updateTableSize(m *Model, newWidth int, newHeight int) {
 
 func initializeProcessListScreen() Model {
 
-	client := procfs.NewClient()
-	service := process.NewService(client, client)
+	procfsClient := procfs.NewClient()
+	sysconfClient := sysconf.NewClient()
+
+	service := process.NewService(procfsClient, procfsClient, sysconfClient, procfsClient)
 	processSummaries, err := service.GetRunningSummaries(context.Background())
 
 	if err != nil {

@@ -9,3 +9,11 @@ type ProcessSource interface {
 type DetailSource interface {
 	Detail(ctx context.Context, pid int) (ProcessDetail, error)
 }
+
+type ClockTickSource interface {
+	ClockTick(ctx context.Context) (int64, error)
+}
+
+type ResourceSource interface {
+	Resource(ctx context.Context, pid int) (ProcessResource, error)
+}

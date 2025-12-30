@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"netps/internal/process"
 	"netps/internal/procfs"
+	"netps/internal/sysconf"
 	"netps/internal/ui/message"
+	"netps/internal/util"
 	"os"
 	"strconv"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -16,12 +19,20 @@ import (
 )
 
 type Model struct {
-	PID           int
-	Name          string
-	ExecPath      string
-	Command       string
-	PPID          int
-	ParentName    string
+	PID        int
+	Name       string
+	ExecPath   string
+	Command    string
+	PPID       int
+	ParentName string
+
+	RSS         int64
+	StartTime   time.Duration
+	ElapsedTime time.Duration
+	VSZ         uint64
+	UTime       time.Duration
+	STime       time.Duration
+
 	width, height int
 }
 
@@ -31,6 +42,15 @@ type detailHydratedMsg struct {
 	PPID       int
 	ParentName string
 	Err        error
+}
+
+type resourceHydratedMsg struct {
+	RSS         int64
+	StartTime   time.Duration
+	ElapsedTime time.Duration
+	VSZ         uint64
+	UTime       time.Duration
+	STime       time.Duration
 }
 
 func New() Model {
@@ -50,6 +70,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Command = msg.Command
 		m.PPID = msg.PPID
 		m.ParentName = msg.ParentName
+	case resourceHydratedMsg:
+		m.RSS = msg.RSS
+		m.StartTime = msg.StartTime
+		m.ElapsedTime = msg.ElapsedTime
+		m.VSZ = msg.VSZ
+		m.UTime = msg.UTime
+		m.STime = msg.STime
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -131,22 +158,28 @@ func (m Model) View() tea.View {
 			),
 		),
 	)
+
+	memText := fmt.Sprintf("%d pages", m.RSS)
 	resourceSection := lipgloss.JoinVertical(lipgloss.Left,
 		sectionHeader("Resources"),
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
 			lipgloss.JoinVertical(lipgloss.Left,
-				grayText("CPU"),
-				grayText("Memory"),
-				grayText("Threads"),
-				grayText("Started"),
+				grayText("Resident Memory"),
+				grayText("Virtual Memory"),
+				grayText("Start Time"),
+				grayText("Elapsed Time"),
+				grayText("User Time"),
+				grayText("System Time"),
 			),
 			sectionHSpacer.Render(),
 			lipgloss.JoinVertical(lipgloss.Left,
-				whiteText("0.2%"),
-				whiteText("42 MB RSS"),
-				whiteText("7"),
-				whiteText("12m ago"),
+				whiteText(memText),
+				whiteText(strconv.Itoa(int(m.VSZ))),
+				whiteText(util.DurationToHHMMSS(m.StartTime)),
+				whiteText(util.DurationToHHMMSS(m.ElapsedTime)),
+				whiteText(util.DurationToHHMMSS(m.UTime)),
+				whiteText(util.DurationToHHMMSS(m.STime)),
 			),
 		),
 	)
@@ -194,8 +227,10 @@ func (m Model) View() tea.View {
 
 func HydrateStaticIds(pid int) tea.Cmd {
 	return func() tea.Msg {
-		client := procfs.NewClient()
-		service := process.NewService(client, client)
+		procfsClient := procfs.NewClient()
+		sysconfClient := sysconf.NewClient()
+
+		service := process.NewService(procfsClient, procfsClient, sysconfClient, procfsClient)
 		processDetail, err := service.GetProcessDetail(context.Background(), pid)
 		if err != nil {
 			panic(err)
@@ -205,7 +240,29 @@ func HydrateStaticIds(pid int) tea.Cmd {
 			Command:    processDetail.Command,
 			PPID:       processDetail.PPID,
 			ParentName: processDetail.ParentName,
-			Err:        err,
+
+			Err: err,
+		}
+	}
+}
+
+func HydrateResource(pid int) tea.Cmd {
+	return func() tea.Msg {
+		procfsClient := procfs.NewClient()
+		sysconfClient := sysconf.NewClient()
+
+		service := process.NewService(procfsClient, procfsClient, sysconfClient, procfsClient)
+		processResource, err := service.GetProcessResource(context.Background(), pid)
+		if err != nil {
+			panic(err)
+		}
+		return resourceHydratedMsg{
+			RSS:         processResource.ResidentSetSizePage,
+			StartTime:   processResource.StartTimeSec,
+			ElapsedTime: processResource.ElapsedTimeSec,
+			VSZ:         processResource.VirtualMemorySize,
+			UTime:       processResource.UserCPUTimeSecond,
+			STime:       processResource.SystemCPUTimeSecond,
 		}
 	}
 }
