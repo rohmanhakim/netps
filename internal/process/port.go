@@ -2,8 +2,8 @@ package process
 
 import "context"
 
-type ProcessSource interface {
-	ListRunnings(ctx context.Context) ([]Process, error)
+type SummarySource interface {
+	ListRunnings(ctx context.Context) ([]ProcessSummary, error)
 }
 
 type DetailSource interface {

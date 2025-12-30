@@ -7,7 +7,7 @@ import (
 )
 
 type Service struct {
-	process   ProcessSource
+	process   SummarySource
 	detail    DetailSource
 	clocktick ClockTickSource
 	pageSize  PageSizeSource
@@ -15,7 +15,7 @@ type Service struct {
 }
 
 func NewService(
-	proc ProcessSource,
+	proc SummarySource,
 	detail DetailSource,
 	clocktick ClockTickSource,
 	pageSize PageSizeSource,
@@ -31,15 +31,15 @@ func NewService(
 }
 
 func (s *Service) GetRunningSummaries(ctx context.Context) ([]ProcessSummary, error) {
-	processes, err := s.process.ListRunnings(ctx)
+	procSum, err := s.process.ListRunnings(ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]ProcessSummary, 0, len(processes))
-	for _, pr := range processes {
-		out = append(out, pr.ToSumary())
+	out := make([]ProcessSummary, 0, len(procSum))
+	for _, pr := range procSum {
+		out = append(out, pr)
 	}
 
 	return out, nil

@@ -16,19 +16,22 @@ func NewClient() *Client {
 	return &Client{}
 }
 
-func (p *Client) ListRunnings(ctx context.Context) ([]process.Process, error) {
+func (p *Client) ListRunnings(ctx context.Context) ([]process.ProcessSummary, error) {
 	runningSockets, err := net.ParseRunningSockets()
 	if err != nil {
 		return nil, err
 	}
 
-	out := []process.Process{}
+	out := []process.ProcessSummary{}
 	for pid, sockets := range runningSockets {
 		name, err := comm.ParseProcessName(pid)
 		if err != nil {
 			return nil, err
 		}
-		proc := process.NewProcess(pid, name).WithSockets(sockets)
+		proc := process.NewSummary(pid, name).
+			WithAggregatedSockets(sockets).
+			WithFilteredListenPorts(sockets)
+
 		out = append(out, *proc)
 	}
 	return out, nil
