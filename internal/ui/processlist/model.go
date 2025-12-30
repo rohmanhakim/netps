@@ -134,7 +134,15 @@ func initializeProcessListScreen() Model {
 	procfsClient := procfs.NewClient()
 	sysconfClient := sysconf.NewClient()
 
-	service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient, procfsClient)
+	service := process.NewService(
+		procfsClient,
+		procfsClient,
+		sysconfClient,
+		sysconfClient,
+		procfsClient,
+		procfsClient,
+		procfsClient,
+	)
 	processSummaries, err := service.GetRunningSummaries(context.Background())
 
 	if err != nil {

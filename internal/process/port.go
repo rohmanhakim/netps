@@ -25,3 +25,7 @@ type UpTimeSource interface {
 type PageSizeSource interface {
 	PageSize(ctx context.Context) (int64, error)
 }
+
+type UserSource interface {
+	User(ctx context.Context, pid int) (ProcessUser, error)
+}

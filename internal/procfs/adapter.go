@@ -8,7 +8,10 @@ import (
 	"netps/internal/procfs/exe"
 	"netps/internal/procfs/net"
 	"netps/internal/procfs/stat"
+	"netps/internal/procfs/status"
 	"netps/internal/procfs/uptime"
+	"os/user"
+	"strconv"
 )
 
 type Client struct{}
@@ -91,4 +94,22 @@ func (p *Client) Resource(ctx context.Context, pid int) (process.ProcessResource
 		SystemCPUTimeClockTick: processStat.STime,
 	}
 	return resource, nil
+}
+
+func (s *Client) User(ctx context.Context, pid int) (process.ProcessUser, error) {
+	realId, err := status.ParseRealUID(pid)
+	if err != nil {
+		return process.ProcessUser{}, err
+	}
+
+	u, err := user.LookupId(strconv.Itoa(realId))
+	if err != nil {
+		return process.ProcessUser{}, err
+	}
+
+	user := process.ProcessUser{
+		RealUID: realId,
+		Name:    u.Username,
+	}
+	return user, nil
 }

@@ -33,6 +33,9 @@ type Model struct {
 	UTime       time.Duration
 	STime       time.Duration
 
+	UserUID  int
+	UserName string
+
 	width, height int
 }
 
@@ -51,6 +54,11 @@ type resourceHydratedMsg struct {
 	VSZByte     uint64
 	UTime       time.Duration
 	STime       time.Duration
+}
+
+type userHydratedMsg struct {
+	UserUID  int
+	UserName string
 }
 
 func New() Model {
@@ -77,6 +85,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.VSZByte = msg.VSZByte
 		m.UTime = msg.UTime
 		m.STime = msg.STime
+	case userHydratedMsg:
+		m.UserUID = msg.UserUID
+		m.UserName = msg.UserName
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -143,6 +154,7 @@ func (m Model) View() tea.View {
 		bulletSectionItem("tcp [::]:1716 (LISTEN)"),
 	)
 
+	userText := fmt.Sprintf("%s (%d)", m.UserName, m.UserUID)
 	ownerSection := lipgloss.JoinVertical(lipgloss.Left,
 		sectionHeader("Owner"),
 		lipgloss.JoinHorizontal(
@@ -153,7 +165,7 @@ func (m Model) View() tea.View {
 			),
 			sectionHSpacer.Render(),
 			lipgloss.JoinVertical(lipgloss.Left,
-				whiteText("arif (1000)"),
+				whiteText(userText),
 				whiteText("unprivileged"),
 			),
 		),
@@ -231,7 +243,15 @@ func HydrateStaticIds(pid int) tea.Cmd {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
 
-		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient, procfsClient)
+		service := process.NewService(
+			procfsClient,
+			procfsClient,
+			sysconfClient,
+			sysconfClient,
+			procfsClient,
+			procfsClient,
+			procfsClient,
+		)
 		processDetail, err := service.GetProcessDetail(context.Background(), pid)
 		if err != nil {
 			panic(err)
@@ -252,7 +272,15 @@ func HydrateResource(pid int) tea.Cmd {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
 
-		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient, procfsClient)
+		service := process.NewService(
+			procfsClient,
+			procfsClient,
+			sysconfClient,
+			sysconfClient,
+			procfsClient,
+			procfsClient,
+			procfsClient,
+		)
 		processResource, err := service.GetProcessResource(context.Background(), pid)
 		if err != nil {
 			panic(err)
@@ -264,6 +292,31 @@ func HydrateResource(pid int) tea.Cmd {
 			VSZByte:     processResource.VirtualMemorySize,
 			UTime:       processResource.UserCPUTimeSecond,
 			STime:       processResource.SystemCPUTimeSecond,
+		}
+	}
+}
+
+func HydrateUser(pid int) tea.Cmd {
+	return func() tea.Msg {
+		procfsClient := procfs.NewClient()
+		sysconfClient := sysconf.NewClient()
+
+		service := process.NewService(
+			procfsClient,
+			procfsClient,
+			sysconfClient,
+			sysconfClient,
+			procfsClient,
+			procfsClient,
+			procfsClient,
+		)
+		processUser, err := service.GetUser(context.Background(), pid)
+		if err != nil {
+			panic(err)
+		}
+		return userHydratedMsg{
+			UserUID:  processUser.RealUID,
+			UserName: processUser.Name,
 		}
 	}
 }

@@ -12,6 +12,7 @@ type Service struct {
 	pageSize  PageSizeSource
 	upTime    UpTimeSource
 	resource  ResourceSource
+	user      UserSource
 }
 
 func NewService(
@@ -21,6 +22,7 @@ func NewService(
 	pageSize PageSizeSource,
 	upTime UpTimeSource,
 	resource ResourceSource,
+	user UserSource,
 ) *Service {
 	return &Service{
 		process:   proc,
@@ -29,6 +31,7 @@ func NewService(
 		pageSize:  pageSize,
 		upTime:    upTime,
 		resource:  resource,
+		user:      user,
 	}
 }
 
@@ -105,4 +108,12 @@ func (s *Service) GetProcessResource(ctx context.Context, pid int) (ProcessResou
 
 	processResource.ResidentSetSizeByte = processResource.ResidentSetSizePage * pageSize
 	return processResource, nil
+}
+
+func (s *Service) GetUser(ctx context.Context, pid int) (ProcessUser, error) {
+	user, err := s.user.User(ctx, pid)
+	if err != nil {
+		return ProcessUser{}, nil
+	}
+	return user, nil
 }

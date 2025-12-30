@@ -43,6 +43,7 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(
 			processdetail.HydrateStaticIds(msg.PID),
 			processdetail.HydrateResource(msg.PID),
+			processdetail.HydrateUser(msg.PID),
 		)
 
 	case message.GoBack:
