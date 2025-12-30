@@ -231,7 +231,7 @@ func HydrateStaticIds(pid int) tea.Cmd {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
 
-		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient)
+		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient, procfsClient)
 		processDetail, err := service.GetProcessDetail(context.Background(), pid)
 		if err != nil {
 			panic(err)
@@ -252,7 +252,7 @@ func HydrateResource(pid int) tea.Cmd {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
 
-		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient)
+		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient, procfsClient)
 		processResource, err := service.GetProcessResource(context.Background(), pid)
 		if err != nil {
 			panic(err)

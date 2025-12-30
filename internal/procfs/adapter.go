@@ -8,6 +8,7 @@ import (
 	"netps/internal/procfs/exe"
 	"netps/internal/procfs/net"
 	"netps/internal/procfs/stat"
+	"netps/internal/procfs/uptime"
 )
 
 type Client struct{}
@@ -66,6 +67,14 @@ func (p *Client) Detail(ctx context.Context, pid int) (process.ProcessDetail, er
 	}
 
 	return detail, nil
+}
+
+func (p *Client) UpTime(ctx context.Context) (float64, error) {
+	upTime, err := uptime.ParseSystemUptime()
+	if err != nil {
+		return -1, err
+	}
+	return upTime, nil
 }
 
 func (p *Client) Resource(ctx context.Context, pid int) (process.ProcessResource, error) {

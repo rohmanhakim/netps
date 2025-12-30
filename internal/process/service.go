@@ -2,7 +2,6 @@ package process
 
 import (
 	"context"
-	"netps/internal/procfs/uptime"
 	"time"
 )
 
@@ -11,6 +10,7 @@ type Service struct {
 	detail    DetailSource
 	clocktick ClockTickSource
 	pageSize  PageSizeSource
+	upTime    UpTimeSource
 	resource  ResourceSource
 }
 
@@ -19,6 +19,7 @@ func NewService(
 	detail DetailSource,
 	clocktick ClockTickSource,
 	pageSize PageSizeSource,
+	upTime UpTimeSource,
 	resource ResourceSource,
 ) *Service {
 	return &Service{
@@ -26,6 +27,7 @@ func NewService(
 		detail:    detail,
 		clocktick: clocktick,
 		pageSize:  pageSize,
+		upTime:    upTime,
 		resource:  resource,
 	}
 }
@@ -83,7 +85,7 @@ func (s *Service) GetProcessResource(ctx context.Context, pid int) (ProcessResou
 	}
 
 	startTimeSec := (processResource.StartTimeTick) / uint64(sysClockTick)
-	upTime, err := uptime.ParseSystemUptime()
+	upTime, err := s.upTime.UpTime(ctx)
 	if err != nil {
 		return ProcessResource{}, nil
 	}
