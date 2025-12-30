@@ -17,3 +17,7 @@ type ClockTickSource interface {
 type ResourceSource interface {
 	Resource(ctx context.Context, pid int) (ProcessResource, error)
 }
+
+type PageSizeSource interface {
+	PageSize(ctx context.Context) (int64, error)
+}

@@ -26,10 +26,10 @@ type Model struct {
 	PPID       int
 	ParentName string
 
-	RSS         int64
+	RSSByte     int64
 	StartTime   time.Duration
 	ElapsedTime time.Duration
-	VSZ         uint64
+	VSZByte     uint64
 	UTime       time.Duration
 	STime       time.Duration
 
@@ -45,10 +45,10 @@ type detailHydratedMsg struct {
 }
 
 type resourceHydratedMsg struct {
-	RSS         int64
+	RSSByte     int64
 	StartTime   time.Duration
 	ElapsedTime time.Duration
-	VSZ         uint64
+	VSZByte     uint64
 	UTime       time.Duration
 	STime       time.Duration
 }
@@ -71,10 +71,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.PPID = msg.PPID
 		m.ParentName = msg.ParentName
 	case resourceHydratedMsg:
-		m.RSS = msg.RSS
+		m.RSSByte = msg.RSSByte
 		m.StartTime = msg.StartTime
 		m.ElapsedTime = msg.ElapsedTime
-		m.VSZ = msg.VSZ
+		m.VSZByte = msg.VSZByte
 		m.UTime = msg.UTime
 		m.STime = msg.STime
 	case tea.KeyMsg:
@@ -159,7 +159,8 @@ func (m Model) View() tea.View {
 		),
 	)
 
-	memText := fmt.Sprintf("%d pages", m.RSS)
+	rssText := fmt.Sprintf("%d Bytes", m.RSSByte)
+	vszText := fmt.Sprintf("%d Bytes", m.VSZByte)
 	resourceSection := lipgloss.JoinVertical(lipgloss.Left,
 		sectionHeader("Resources"),
 		lipgloss.JoinHorizontal(
@@ -174,8 +175,8 @@ func (m Model) View() tea.View {
 			),
 			sectionHSpacer.Render(),
 			lipgloss.JoinVertical(lipgloss.Left,
-				whiteText(memText),
-				whiteText(strconv.Itoa(int(m.VSZ))),
+				whiteText(rssText),
+				whiteText(vszText),
 				whiteText(util.DurationToHHMMSS(m.StartTime)),
 				whiteText(util.DurationToHHMMSS(m.ElapsedTime)),
 				whiteText(util.DurationToHHMMSS(m.UTime)),
@@ -230,7 +231,7 @@ func HydrateStaticIds(pid int) tea.Cmd {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
 
-		service := process.NewService(procfsClient, procfsClient, sysconfClient, procfsClient)
+		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient)
 		processDetail, err := service.GetProcessDetail(context.Background(), pid)
 		if err != nil {
 			panic(err)
@@ -251,16 +252,16 @@ func HydrateResource(pid int) tea.Cmd {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
 
-		service := process.NewService(procfsClient, procfsClient, sysconfClient, procfsClient)
+		service := process.NewService(procfsClient, procfsClient, sysconfClient, sysconfClient, procfsClient)
 		processResource, err := service.GetProcessResource(context.Background(), pid)
 		if err != nil {
 			panic(err)
 		}
 		return resourceHydratedMsg{
-			RSS:         processResource.ResidentSetSizePage,
+			RSSByte:     processResource.ResidentSetSizeByte,
 			StartTime:   processResource.StartTimeSec,
 			ElapsedTime: processResource.ElapsedTimeSec,
-			VSZ:         processResource.VirtualMemorySize,
+			VSZByte:     processResource.VirtualMemorySize,
 			UTime:       processResource.UserCPUTimeSecond,
 			STime:       processResource.SystemCPUTimeSecond,
 		}

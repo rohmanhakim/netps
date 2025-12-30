@@ -10,6 +10,7 @@ type Service struct {
 	process   ProcessSource
 	detail    DetailSource
 	clocktick ClockTickSource
+	pageSize  PageSizeSource
 	resource  ResourceSource
 }
 
@@ -17,12 +18,14 @@ func NewService(
 	proc ProcessSource,
 	detail DetailSource,
 	clocktick ClockTickSource,
+	pageSize PageSizeSource,
 	resource ResourceSource,
 ) *Service {
 	return &Service{
 		process:   proc,
 		detail:    detail,
 		clocktick: clocktick,
+		pageSize:  pageSize,
 		resource:  resource,
 	}
 }
@@ -60,6 +63,15 @@ func (s *Service) GetClockTick(ctx context.Context) (int64, error) {
 	return clocktick, nil
 }
 
+func (s *Service) GetPageSize(ctx context.Context) (int64, error) {
+	pageSize, err := s.pageSize.PageSize(ctx)
+	if err != nil {
+		return -1, nil
+	}
+
+	return pageSize, nil
+}
+
 func (s *Service) GetProcessResource(ctx context.Context, pid int) (ProcessResource, error) {
 	processResource, err := s.resource.Resource(ctx, pid)
 	if err != nil {
@@ -84,5 +96,11 @@ func (s *Service) GetProcessResource(ctx context.Context, pid int) (ProcessResou
 	processResource.UserCPUTimeSecond = time.Duration(uCpuTimeSec) * time.Second
 	processResource.SystemCPUTimeSecond = time.Duration(sCpuTimeSec) * time.Second
 
+	pageSize, err := s.pageSize.PageSize(ctx)
+	if err != nil {
+		return ProcessResource{}, err
+	}
+
+	processResource.ResidentSetSizeByte = processResource.ResidentSetSizePage * pageSize
 	return processResource, nil
 }

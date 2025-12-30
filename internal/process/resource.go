@@ -3,7 +3,8 @@ package process
 import "time"
 
 type ProcessResource struct {
-	ResidentSetSizePage    int64  //pages
+	ResidentSetSizePage    int64 //pages
+	ResidentSetSizeByte    int64
 	VirtualMemorySize      uint64 // bytes
 	StartTimeTick          uint64
 	StartTimeSec           time.Duration
