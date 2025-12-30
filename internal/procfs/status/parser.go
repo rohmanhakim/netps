@@ -37,3 +37,24 @@ func ParseRealUID(pid int) (int, error) {
 
 	return 0, fmt.Errorf("Uid field not found")
 }
+
+func ParseEffectiveUID(pid int) (int, error) {
+	f, err := os.Open(fmt.Sprintf("/proc/%d/status", pid))
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "Uid:") {
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				return 0, fmt.Errorf("malformed Uid line")
+			}
+			return strconv.Atoi(fields[2]) // Effective UID
+		}
+	}
+	return 0, fmt.Errorf("Uid field not found")
+}

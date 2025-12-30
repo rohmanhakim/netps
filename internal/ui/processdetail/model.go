@@ -33,8 +33,9 @@ type Model struct {
 	UTime       time.Duration
 	STime       time.Duration
 
-	UserUID  int
-	UserName string
+	UserUID        int
+	UserName       string
+	UserPrivileged bool
 
 	width, height int
 }
@@ -57,8 +58,9 @@ type resourceHydratedMsg struct {
 }
 
 type userHydratedMsg struct {
-	UserUID  int
-	UserName string
+	UserUID        int
+	UserName       string
+	UserPrivileged bool
 }
 
 func New() Model {
@@ -88,6 +90,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case userHydratedMsg:
 		m.UserUID = msg.UserUID
 		m.UserName = msg.UserName
+		m.UserPrivileged = msg.UserPrivileged
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -155,6 +158,10 @@ func (m Model) View() tea.View {
 	)
 
 	userText := fmt.Sprintf("%s (%d)", m.UserName, m.UserUID)
+	privilegedText := "unprivileged"
+	if m.UserPrivileged {
+		privilegedText = "privileged"
+	}
 	ownerSection := lipgloss.JoinVertical(lipgloss.Left,
 		sectionHeader("Owner"),
 		lipgloss.JoinHorizontal(
@@ -166,7 +173,7 @@ func (m Model) View() tea.View {
 			sectionHSpacer.Render(),
 			lipgloss.JoinVertical(lipgloss.Left,
 				whiteText(userText),
-				whiteText("unprivileged"),
+				whiteText(privilegedText),
 			),
 		),
 	)
@@ -315,8 +322,9 @@ func HydrateUser(pid int) tea.Cmd {
 			panic(err)
 		}
 		return userHydratedMsg{
-			UserUID:  processUser.RealUID,
-			UserName: processUser.Name,
+			UserUID:        processUser.RealUID,
+			UserName:       processUser.Name,
+			UserPrivileged: processUser.Privileged,
 		}
 	}
 }

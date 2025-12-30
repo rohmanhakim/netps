@@ -107,9 +107,15 @@ func (s *Client) User(ctx context.Context, pid int) (process.ProcessUser, error)
 		return process.ProcessUser{}, err
 	}
 
+	effectiveId, err := status.ParseEffectiveUID(pid)
+	if err != nil {
+		return process.ProcessUser{}, err
+	}
+
 	user := process.ProcessUser{
-		RealUID: realId,
-		Name:    u.Username,
+		RealUID:    realId,
+		Name:       u.Username,
+		Privileged: effectiveId == 0,
 	}
 	return user, nil
 }

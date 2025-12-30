@@ -1,6 +1,7 @@
 package process
 
 type ProcessUser struct {
-	RealUID int
-	Name    string
+	RealUID    int
+	Name       string
+	Privileged bool
 }
