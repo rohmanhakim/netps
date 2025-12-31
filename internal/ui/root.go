@@ -17,6 +17,7 @@ const (
 
 type Root struct {
 	screen        Screen
+	width, height int
 	processList   processlist.Model
 	processDetail processdetail.Model
 }
@@ -33,7 +34,9 @@ func (m Root) Init() tea.Cmd { return nil }
 
 func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 	case message.GoToProcessDetail:
 		m.processDetail = processdetail.Model{
 			PID:  msg.PID,
@@ -41,6 +44,7 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.screen = ScreenProcessDetail
 		return m, tea.Batch(
+			processdetail.Initialize(m.width, m.height),
 			processdetail.HydrateStaticIds(msg.PID),
 			processdetail.HydrateResource(msg.PID),
 			processdetail.HydrateUser(msg.PID),

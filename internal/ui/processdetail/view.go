@@ -102,7 +102,7 @@ func horizontalGroup(sections ...string) string {
 	return container.Render(lipgloss.JoinHorizontal(lipgloss.Top, margined...))
 }
 
-func actionBar(windowWidth int) string {
+func renderActionBar(windowWidth int) string {
 
 	statusBarStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#C1C6B2")).

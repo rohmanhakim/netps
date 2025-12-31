@@ -1,0 +1,24 @@
+
+Name      firefox
+PID       23820
+Exec Path /usr/lib/firefox/firefox
+Parent    systemd (3612)
+
+Command
+───────
+/usr/lib/firefox/firefox
+
+Section                                  Resources
+───────                                  ─────────
+• tcp 192.168.8.136:41308 (ESTABLISHED)  Resident Memory 879120384 Bytes
+• tcp 192.168.8.136:42200 (ESTABLISHED)  Virtual Memory  12684263424 Bytes
+• tcp 192.168.8.136:38490 (ESTABLISHED)  Start Time      00:01:42
+• tcp 192.168.8.136:56436 (ESTABLISHED)  Elapsed Time    07:20:16
+• tcp 192.168.8.136:38968 (ESTABLISHED)  User Time       00:12:28
+• tcp 192.168.8.136:54228 (ESTABLISHED)  System Time     00:04:07
+• tcp 192.168.8.136:39304 (ESTABLISHED)
+
+Owner
+─────
+User      arif (1000)
+Privilege unprivileged

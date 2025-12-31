@@ -31,3 +31,8 @@ type userHydratedMsg struct {
 type socketHydrateMsg struct {
 	Sockets []socket.Socket
 }
+
+type initMsg struct {
+	content       string
+	width, height int
+}
