@@ -3,33 +3,50 @@ package net
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"maps"
 	"net"
 	"netps/internal/socket"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
 
-func ParseRunningSockets() (map[int][]socket.Socket, error) {
-	socketMaps := make(map[uint64]socket.Socket)
-
-	procNetfiles := []struct {
-		path  string
-		proto string
-	}{
-		{"/proc/net/tcp", "tcp"},
-		{"/proc/net/tcp6", "tcp6"},
-		{"/proc/net/udp", "udp"},
-		{"/proc/net/udp6", "udp6"},
+func ParseSockets(pid int) ([]socket.Socket, error) {
+	sockets := []socket.Socket{}
+	inodes, err := getInodes(pid)
+	if err != nil {
+		return []socket.Socket{}, err
 	}
 
-	for _, f := range procNetfiles {
-		m, err := parseProcNet(f.path, f.proto)
-		if err == nil {
-			maps.Copy(socketMaps, m)
-		}
+	inodeSocketMap, errs := getInodeSocketMap()
+	for _, e := range errs {
+		slog.Error("ParseSockets() -> Error when parsing inode sockets map", "msg", e.Error())
+	}
+
+	for _, inode := range inodes {
+		sockets = append(sockets, inodeSocketMap[inode])
+	}
+	return sockets, nil
+}
+
+func ParseSocketsByStates(pid int, state []string) ([]socket.Socket, error) {
+	socks, err := ParseSockets(pid)
+	if err != nil {
+		return []socket.Socket{}, err
+	}
+
+	filtered := filterSockets(socks, state)
+	return filtered, nil
+}
+
+func ParseRunningSockets() (map[int][]socket.Socket, error) {
+	inodeSocketMap, errs := getInodeSocketMap()
+
+	for _, e := range errs {
+		slog.Error("ParseRunningSockets() -> Error when parsing inode sockets map", "msg", e.Error())
 	}
 
 	inodePID, err := mapInodeToPID()
@@ -38,7 +55,7 @@ func ParseRunningSockets() (map[int][]socket.Socket, error) {
 	}
 
 	procMap := make(map[int][]socket.Socket)
-	for inode, sock := range socketMaps {
+	for inode, sock := range inodeSocketMap {
 		if pid, ok := inodePID[inode]; ok {
 			procMap[pid] = append(procMap[pid], sock)
 		}
@@ -176,7 +193,8 @@ func mapInodeToPID() (map[uint64]int, error) {
 		}
 
 		for _, fd := range fds {
-			link, err := os.Readlink(filepath.Join(fdDir, fd.Name()))
+			linkPath := filepath.Join(fdDir, fd.Name())
+			link, err := os.Readlink(linkPath)
 			if err != nil {
 				continue
 			}
@@ -192,4 +210,65 @@ func mapInodeToPID() (map[uint64]int, error) {
 	}
 
 	return result, nil
+}
+
+func getInodeSocketMap() (map[uint64]socket.Socket, []error) {
+	inodeSocketMap := make(map[uint64]socket.Socket)
+	errors := []error{}
+	procNetfiles := []struct {
+		path  string
+		proto string
+	}{
+		{"/proc/net/tcp", "tcp"},
+		{"/proc/net/tcp6", "tcp6"},
+		{"/proc/net/udp", "udp"},
+		{"/proc/net/udp6", "udp6"},
+	}
+
+	for _, f := range procNetfiles {
+		m, err := parseProcNet(f.path, f.proto)
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+		maps.Copy(inodeSocketMap, m)
+	}
+	return inodeSocketMap, []error{}
+}
+
+func getInodes(pid int) ([]uint64, error) {
+
+	result := []uint64{}
+	fdDir := filepath.Join("/proc", strconv.Itoa(pid), "fd")
+	fds, err := os.ReadDir(fdDir)
+	if err != nil {
+		return []uint64{}, err
+	}
+
+	for _, fd := range fds {
+		linkPath := filepath.Join(fdDir, fd.Name())
+		link, err := os.Readlink(linkPath)
+		if err != nil {
+			continue
+		}
+
+		if strings.HasPrefix(link, "socket:[") {
+			inodeStr := strings.TrimSuffix(strings.TrimPrefix(link, "socket:["), "]")
+			inode, err := strconv.ParseUint(inodeStr, 10, 64)
+			if err == nil {
+				result = append(result, inode)
+			}
+		}
+	}
+	return result, nil
+}
+
+func filterSockets(socks []socket.Socket, states []string) []socket.Socket {
+	filtered := []socket.Socket{}
+	for _, sock := range socks {
+		if slices.Contains(states, sock.State) {
+			filtered = append(filtered, sock)
+		}
+	}
+	return filtered
 }

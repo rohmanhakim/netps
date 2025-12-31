@@ -10,6 +10,7 @@ import (
 	"netps/internal/procfs/stat"
 	"netps/internal/procfs/status"
 	"netps/internal/procfs/uptime"
+	"netps/internal/socket"
 	"os/user"
 	"strconv"
 )
@@ -118,4 +119,12 @@ func (s *Client) User(ctx context.Context, pid int) (process.ProcessUser, error)
 		Privileged: effectiveId == 0,
 	}
 	return user, nil
+}
+
+func (s *Client) SocketsByStates(ctx context.Context, pid int, states []string) ([]socket.Socket, error) {
+	sockets, err := net.ParseSocketsByStates(pid, states)
+	if err != nil {
+		return []socket.Socket{}, err
+	}
+	return sockets, nil
 }

@@ -44,6 +44,7 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			processdetail.HydrateStaticIds(msg.PID),
 			processdetail.HydrateResource(msg.PID),
 			processdetail.HydrateUser(msg.PID),
+			processdetail.HydrateSockets(msg.PID),
 		)
 
 	case message.GoBack:
