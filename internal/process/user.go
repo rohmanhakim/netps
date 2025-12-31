@@ -5,3 +5,10 @@ type ProcessUser struct {
 	Name       string
 	Privileged bool
 }
+
+func (pu *ProcessUser) PrivilegedString() string {
+	if pu.Privileged {
+		return "privileged"
+	}
+	return "unprivileged"
+}
