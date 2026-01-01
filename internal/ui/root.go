@@ -26,7 +26,7 @@ func New() Root {
 	return Root{
 		screen:        ScreenProcessList,
 		processList:   processlist.New(),
-		processDetail: processdetail.New(),
+		processDetail: processdetail.Model{},
 	}
 }
 
@@ -38,10 +38,7 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case message.GoToProcessDetail:
-		m.processDetail = processdetail.Model{
-			PID:  msg.PID,
-			Name: msg.Name,
-		}
+		m.processDetail = processdetail.New(msg.PID, msg.Name)
 		m.screen = ScreenProcessDetail
 		return m, tea.Batch(
 			processdetail.Initialize(m.width, m.height),

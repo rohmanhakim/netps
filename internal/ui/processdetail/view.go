@@ -107,14 +107,15 @@ func horizontalGroup(sections ...string) string {
 	return container.Render(lipgloss.JoinHorizontal(lipgloss.Top, margined...))
 }
 
-func actionBar(windowWidth int) string {
+func actionBar(windowWidth int, actions []string) string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#C1C6B2")).
 		Background(lipgloss.Color("#353533"))
 
 	out := style.
 		Width(windowWidth).
-		Render("[↑↓] scroll · [s] send signal · [c] copy · [esc] back · [q] quit")
+		Render(strings.Join(actions, " · "))
+		// Render("[↑↓] scroll · [s] send signal · [c] copy · [esc] back · [q] quit")
 	return out
 }
 
@@ -238,7 +239,7 @@ func processDetailSection(
 		verticalGroup(socketSection),
 	)
 
-	contentHeight := height - lipgloss.Height(actionBar(width)) - base.GetVerticalFrameSize()
+	contentHeight := height - lipgloss.Height(actionBar(width, []string{""})) - base.GetVerticalFrameSize()
 	ui := lipgloss.NewStyle().
 		Height(contentHeight).
 		Width(width - base.GetHorizontalFrameSize()).
