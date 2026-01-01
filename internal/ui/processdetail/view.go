@@ -109,8 +109,7 @@ func horizontalGroup(sections ...string) string {
 
 func actionBar(windowWidth int, actions []string) string {
 	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#C1C6B2")).
-		Background(lipgloss.Color("#353533"))
+		Foreground(lipgloss.Color("#FFF"))
 
 	out := style.
 		Width(windowWidth).
@@ -119,12 +118,24 @@ func actionBar(windowWidth int, actions []string) string {
 	return out
 }
 
-func statusBar(scrollPercent float64) string {
-	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EEE"))
+func statusBar(windowWidth int, modeName string, modeColor string, scrollPercent float64) string {
+	scrollingInfoStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("237")).
+		Foreground(lipgloss.Color("#C1C6B2"))
 
-	info := style.Render(fmt.Sprintf("scrolling %3.f%%", scrollPercent*100))
-	return lipgloss.JoinHorizontal(lipgloss.Center, info)
+	modeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color(modeColor)).
+		Align(lipgloss.Left)
+
+	mode := modeStyle.Render(modeName)
+	info := scrollingInfoStyle.
+		Render(fmt.Sprintf("scrolling %3.f%%", scrollPercent*100))
+	lineStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("237"))
+	line := lineStyle.
+		Render(strings.Repeat(" ", max(0, windowWidth-lipgloss.Width(mode)-lipgloss.Width(info))))
+	return lipgloss.JoinHorizontal(lipgloss.Center, mode, line, info)
 }
 
 func horizontalSpacer(height int) string {

@@ -42,6 +42,7 @@ type Model struct {
 	sendSignalList      list.Model
 	idleHelpItems       []string
 	sendSignalHelpItems []string
+	modeColor           string
 }
 
 type styleFunc func(string) string
@@ -80,7 +81,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case initMsg:
-		m.mode = "IDLE"
+		m.mode = "Process Detail"
 		m.content = m.renderContent()
 		m.updateViewport(msg.width, msg.height)
 	case tea.WindowSizeMsg:
@@ -109,16 +110,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Sockets = msg.Sockets
 		rerenderContent = true
 	case sendSignalMsg:
-		m.mode = "SEND_SIGNAL"
+		m.mode = "Send Signal"
 		m.initializeSendSignalList()
 		rerenderContent = true
 	case closeSendSignalModalMsg:
-		m.mode = "IDLE"
+		m.mode = "Process Detail"
 		rerenderContent = true
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			if m.mode == "SEND_SIGNAL" {
+			if m.mode == "Send Signal" {
 				return m, func() tea.Msg {
 					return closeSendSignalModalMsg{}
 				}
@@ -128,7 +129,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 			}
 		case "s":
-			if m.mode == "IDLE" {
+			if m.mode == "Process Detail" {
 				return m, func() tea.Msg {
 					return sendSignalMsg{}
 				}
@@ -145,9 +146,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
-	if m.mode == "SEND_SIGNAL" {
+	if m.mode == "Send Signal" {
+		m.modeColor = "57"
 		m.sendSignalList, cmd = m.sendSignalList.Update(msg)
 	} else {
+		m.modeColor = "243"
 		m.viewport, cmd = m.viewport.Update(msg)
 	}
 
@@ -167,7 +170,7 @@ func (m Model) View() tea.View {
 		var canvas *lipgloss.Canvas
 		var ui *lipgloss.Layer
 
-		if m.mode == "SEND_SIGNAL" {
+		if m.mode == "Send Signal" {
 			signalList := m.sendSignalList
 			signalListView := signalList.View()
 			modal := commandModal(signalListView)
@@ -178,8 +181,8 @@ func (m Model) View() tea.View {
 			ui = lipgloss.NewLayer(
 				fmt.Sprintf("%s\n%s\n%s",
 					m.viewport.View(),
+					statusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
 					actionBar(m.width, m.sendSignalHelpItems),
-					statusBar(m.viewport.ScrollPercent()),
 				),
 			).Z(0)
 
@@ -188,8 +191,8 @@ func (m Model) View() tea.View {
 			ui = lipgloss.NewLayer(
 				fmt.Sprintf("%s\n%s\n%s",
 					m.viewport.View(),
+					statusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
 					actionBar(m.width, m.idleHelpItems),
-					statusBar(m.viewport.ScrollPercent()),
 				),
 			).Z(0)
 
@@ -250,7 +253,7 @@ func (m *Model) updateViewport(width, height int) {
 	m.width = width
 	m.height = height
 	actionBarHeight := lipgloss.Height(actionBar(m.width, m.idleHelpItems))
-	statusBarHeight := lipgloss.Height(statusBar(m.viewport.ScrollPercent()))
+	statusBarHeight := lipgloss.Height(statusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()))
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(height-actionBarHeight-statusBarHeight))
 		m.viewport.SetContent(m.content)
