@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"netps/internal/socket"
 	"netps/internal/ui/message"
-	"netps/internal/util"
-	"strconv"
 	"time"
 
 	"charm.land/bubbles/v2/viewport"
@@ -60,10 +58,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case initMsg:
 		m.content = m.renderContent()
-		m.updateWindowSize(msg.width, msg.height)
+		m.updateViewport(msg.width, msg.height)
 	case tea.WindowSizeMsg:
 		m.content = m.renderContent()
-		m.updateWindowSize(msg.Width, msg.Height)
+		m.updateViewport(msg.Width, msg.Height)
 	case detailHydratedMsg:
 		m.ExecPath = msg.ExecPath
 		m.Command = msg.Command
@@ -118,10 +116,33 @@ func (m Model) View() tea.View {
 	if !m.viewportReady {
 		v.SetContent("\n  Initializing...")
 	} else {
-		v.SetContent(fmt.Sprintf("%s\n%s", m.viewport.View(), m.actionBar()))
+		v.SetContent(fmt.Sprintf("%s\n%s", m.viewport.View(), actionBar(m.width)))
 	}
 
 	return v
+}
+
+func (m Model) renderContent() string {
+	return processDetailSection(
+		m.width,
+		m.height,
+		m.Name,
+		m.PID,
+		m.ExecPath,
+		m.ParentName,
+		m.PPID,
+		m.Command,
+		m.Sockets,
+		m.UserUID,
+		m.UserName,
+		m.UserPrivileged,
+		int(m.RSSByte),
+		int(m.VSZByte),
+		m.StartTime,
+		m.ElapsedTime,
+		m.UTime,
+		m.STime,
+	)
 }
 
 func formatSocketText(sock socket.Socket, lStyle styleFunc, eStyle styleFunc, cStyle styleFunc) string {
@@ -137,106 +158,6 @@ func formatSocketText(sock socket.Socket, lStyle styleFunc, eStyle styleFunc, cS
 	return text
 }
 
-func (m Model) actionBar() string {
-	return renderActionBar(m.width)
-}
-
-func (m Model) renderContent() string {
-
-	baseColor := lipgloss.Color("#EEEEEE")
-	base := lipgloss.NewStyle().Foreground(baseColor)
-
-	positive := lipgloss.Color("#aad84c")
-	neutral := lipgloss.Color("#56b8f2")
-
-	whiteText := lipgloss.NewStyle().Foreground(baseColor).Render
-	grayText := lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")).Render
-
-	positiveBullet := lipgloss.NewStyle().SetString("•").
-		Foreground(positive).
-		PaddingRight(1).
-		String()
-
-	neutralBullet := lipgloss.NewStyle().SetString("•").
-		Foreground(neutral).
-		PaddingRight(1).
-		String()
-
-	idleBullet := lipgloss.NewStyle().SetString("•").
-		Foreground(lipgloss.Color("#333")).
-		PaddingRight(1).
-		String()
-
-	listenSocketItem := func(s string) string {
-		return positiveBullet + whiteText(s)
-	}
-	establishedSocketItem := func(s string) string {
-		return neutralBullet + whiteText(s)
-	}
-	closedSocketItem := func(s string) string {
-		return idleBullet + grayText(s)
-	}
-
-	staticIdLabels := []string{
-		"Name",
-		"PID",
-		"Exec Path",
-		"Parent",
-	}
-	staticIdValues := []string{
-		m.Name,
-		strconv.Itoa(m.PID),
-		m.ExecPath,
-		fmt.Sprintf("%s (%d)", m.ParentName, m.PPID),
-	}
-	staticIdSection := labeledList("", staticIdLabels, staticIdValues)
-
-	commandSection := list("Command", []string{grayText(m.Command)})
-
-	socketItems := []string{}
-	for _, s := range m.Sockets {
-		socketItems = append(socketItems, formatSocketText(s, listenSocketItem, establishedSocketItem, closedSocketItem))
-	}
-	socketSection := list("Sockets", socketItems)
-
-	ownerShipLabels := []string{"User", "Privilege"}
-	ownerShipValues := []string{
-		fmt.Sprintf("%s (%d)", m.UserName, m.UserUID),
-		m.UserPrivileged}
-	ownerSection := labeledList("Ownership", ownerShipLabels, ownerShipValues)
-
-	resourceLabels := []string{
-		"Resident Memory",
-		"Virtual Memory",
-		"Start Time",
-		"Elapsed Time",
-		"User Time",
-		"System Time"}
-	resourceValues := []string{
-		fmt.Sprintf("%d Bytes", m.RSSByte),
-		fmt.Sprintf("%d Bytes", m.VSZByte),
-		util.DurationToHHMMSS(m.StartTime),
-		util.DurationToHHMMSS(m.ElapsedTime),
-		util.DurationToHHMMSS(m.UTime),
-		util.DurationToHHMMSS(m.STime)}
-	resourceSection := labeledList("Resources", resourceLabels, resourceValues)
-
-	firstSection := verticalGroup(staticIdSection, commandSection)
-	secondSection := horizontalGroup(
-		verticalGroup(socketSection, ownerSection),
-		resourceSection,
-	)
-
-	contentHeight := m.height - lipgloss.Height(m.actionBar()) - base.GetVerticalFrameSize()
-	ui := lipgloss.NewStyle().
-		Height(contentHeight).
-		Width(m.width - base.GetHorizontalFrameSize()).
-		Render(
-			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection),
-		)
-	return ui
-}
-
 func Initialize(width, height int) tea.Cmd {
 	return func() tea.Msg {
 		return initMsg{
@@ -246,10 +167,10 @@ func Initialize(width, height int) tea.Cmd {
 	}
 }
 
-func (m *Model) updateWindowSize(width, height int) {
+func (m *Model) updateViewport(width, height int) {
 	m.width = width
 	m.height = height
-	actionBarHeight := lipgloss.Height(m.actionBar())
+	actionBarHeight := lipgloss.Height(actionBar(m.width))
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(height-actionBarHeight))
 		m.viewport.SetContent(m.content)

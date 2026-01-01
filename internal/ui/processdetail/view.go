@@ -1,7 +1,12 @@
 package processdetail
 
 import (
+	"fmt"
+	"netps/internal/socket"
+	"netps/internal/util"
+	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 )
@@ -102,7 +107,7 @@ func horizontalGroup(sections ...string) string {
 	return container.Render(lipgloss.JoinHorizontal(lipgloss.Top, margined...))
 }
 
-func renderActionBar(windowWidth int) string {
+func actionBar(windowWidth int) string {
 
 	statusBarStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#C1C6B2")).
@@ -113,4 +118,119 @@ func renderActionBar(windowWidth int) string {
 		Width(windowWidth).
 		Render("[s] send signal · [c] copy · [esc] back")
 	return statusVal
+}
+
+func processDetailSection(
+	width int,
+	height int,
+	name string,
+	pid int,
+	execPath string,
+	parentName string,
+	ppid int,
+	command string,
+	sockets []socket.Socket,
+	userUid int,
+	userName string,
+	userPrivileged string,
+	rssByte int,
+	vszByte int,
+	startTime time.Duration,
+	elapsedTime time.Duration,
+	uTime time.Duration,
+	sTime time.Duration,
+) string {
+
+	baseColor := lipgloss.Color("#EEEEEE")
+	base := lipgloss.NewStyle().Foreground(baseColor)
+
+	positive := lipgloss.Color("#aad84c")
+	neutral := lipgloss.Color("#56b8f2")
+
+	whiteText := lipgloss.NewStyle().Foreground(baseColor).Render
+	grayText := lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")).Render
+
+	positiveBullet := lipgloss.NewStyle().SetString("•").
+		Foreground(positive).
+		PaddingRight(1).
+		String()
+
+	neutralBullet := lipgloss.NewStyle().SetString("•").
+		Foreground(neutral).
+		PaddingRight(1).
+		String()
+
+	idleBullet := lipgloss.NewStyle().SetString("•").
+		Foreground(lipgloss.Color("#333")).
+		PaddingRight(1).
+		String()
+
+	listenSocketItem := func(s string) string {
+		return positiveBullet + whiteText(s)
+	}
+	establishedSocketItem := func(s string) string {
+		return neutralBullet + whiteText(s)
+	}
+	closedSocketItem := func(s string) string {
+		return idleBullet + grayText(s)
+	}
+
+	staticIdLabels := []string{
+		"Name",
+		"PID",
+		"Exec Path",
+		"Parent",
+	}
+	staticIdValues := []string{
+		name,
+		strconv.Itoa(pid),
+		execPath,
+		fmt.Sprintf("%s (%d)", parentName, ppid),
+	}
+	staticIdSection := labeledList("", staticIdLabels, staticIdValues)
+
+	commandSection := list("Command", []string{grayText(command)})
+
+	socketItems := []string{}
+	for _, s := range sockets {
+		socketItems = append(socketItems, formatSocketText(s, listenSocketItem, establishedSocketItem, closedSocketItem))
+	}
+	socketSection := list("Sockets", socketItems)
+
+	ownerShipLabels := []string{"User", "Privilege"}
+	ownerShipValues := []string{
+		fmt.Sprintf("%s (%d)", userName, userUid),
+		userPrivileged}
+	ownerSection := labeledList("Ownership", ownerShipLabels, ownerShipValues)
+
+	resourceLabels := []string{
+		"Resident Memory",
+		"Virtual Memory",
+		"Start Time",
+		"Elapsed Time",
+		"User Time",
+		"System Time"}
+	resourceValues := []string{
+		fmt.Sprintf("%d Bytes", rssByte),
+		fmt.Sprintf("%d Bytes", vszByte),
+		util.DurationToHHMMSS(startTime),
+		util.DurationToHHMMSS(elapsedTime),
+		util.DurationToHHMMSS(uTime),
+		util.DurationToHHMMSS(sTime)}
+	resourceSection := labeledList("Resources", resourceLabels, resourceValues)
+
+	firstSection := verticalGroup(staticIdSection, commandSection)
+	secondSection := horizontalGroup(
+		verticalGroup(socketSection, ownerSection),
+		resourceSection,
+	)
+
+	contentHeight := height - lipgloss.Height(actionBar(width)) - base.GetVerticalFrameSize()
+	ui := lipgloss.NewStyle().
+		Height(contentHeight).
+		Width(width - base.GetHorizontalFrameSize()).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection),
+		)
+	return ui
 }
