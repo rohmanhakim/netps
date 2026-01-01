@@ -120,6 +120,12 @@ func actionBar(windowWidth int) string {
 	return statusVal
 }
 
+func horizontalSpacer(height int) string {
+	hSpacer := lipgloss.NewStyle().
+		Height(height)
+	return hSpacer.Render()
+}
+
 func processDetailSection(
 	width int,
 	height int,
@@ -221,8 +227,8 @@ func processDetailSection(
 
 	firstSection := verticalGroup(staticIdSection, commandSection)
 	secondSection := horizontalGroup(
-		verticalGroup(socketSection, ownerSection),
-		resourceSection,
+		verticalGroup(resourceSection, ownerSection),
+		verticalGroup(socketSection),
 	)
 
 	contentHeight := height - lipgloss.Height(actionBar(width)) - base.GetVerticalFrameSize()
@@ -230,7 +236,7 @@ func processDetailSection(
 		Height(contentHeight).
 		Width(width - base.GetHorizontalFrameSize()).
 		Render(
-			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection),
+			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection, horizontalSpacer(1)),
 		)
 	return ui
 }
