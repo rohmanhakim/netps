@@ -207,7 +207,8 @@ func processDetailSection(
 	for _, s := range sockets {
 		socketItems = append(socketItems, formatSocketText(s, listenSocketItem, establishedSocketItem, closedSocketItem))
 	}
-	socketSection := list("Sockets", socketItems)
+	aggregated := socket.Aggregate(sockets)
+	socketSection := list(fmt.Sprintf("Sockets · %dL %dE %dC (%d)", aggregated.ListenCount, aggregated.EstablishedCount, aggregated.CloseCount, len(socketItems)), socketItems)
 
 	ownerShipLabels := []string{"User", "Privilege"}
 	ownerShipValues := []string{

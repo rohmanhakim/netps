@@ -1,10 +1,18 @@
 package socket
 
+import "log"
+
 type Socket struct {
 	Proto string
 	Addr  string
 	Port  int
 	State string
+}
+
+type AggregatedSockets struct {
+	EstablishedCount int
+	ListenCount      int
+	CloseCount       int
 }
 
 func NewSocketInfo(proto, addr string, port int, state string) *Socket {
@@ -14,4 +22,21 @@ func NewSocketInfo(proto, addr string, port int, state string) *Socket {
 		Port:  port,
 		State: state,
 	}
+}
+
+func Aggregate(socks []Socket) AggregatedSockets {
+	aggregated := AggregatedSockets{}
+	for _, socket := range socks {
+		switch socket.State {
+		case "LISTEN":
+			aggregated.ListenCount++
+		case "ESTABLISHED":
+			aggregated.EstablishedCount++
+		case "CLOSE":
+			aggregated.CloseCount++
+		default:
+			log.Printf("Unknown socket state: %s", socket.State)
+		}
+	}
+	return aggregated
 }

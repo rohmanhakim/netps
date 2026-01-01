@@ -1,7 +1,6 @@
 package process
 
 import (
-	"log"
 	"netps/internal/socket"
 	"strconv"
 	"strings"
@@ -25,22 +24,10 @@ func NewSummary(pid int, name string) *ProcessSummary {
 }
 
 func (p *ProcessSummary) WithAggregatedSockets(socks []socket.Socket) *ProcessSummary {
-	aggregated := make(map[string]int)
-	for _, socket := range socks {
-		switch socket.State {
-		case "LISTEN":
-			aggregated["L"]++
-		case "ESTABLISHED":
-			aggregated["E"]++
-		case "CLOSE":
-			aggregated["C"]++
-		default:
-			log.Printf("Unknown socket state: %s", socket.State)
-		}
-	}
-	p.LSocketCount = aggregated["L"]
-	p.ESocketCount = aggregated["E"]
-	p.CSocketCount = aggregated["C"]
+	aggregated := socket.Aggregate(socks)
+	p.LSocketCount = aggregated.ListenCount
+	p.ESocketCount = aggregated.EstablishedCount
+	p.CSocketCount = aggregated.CloseCount
 	return p
 }
 
