@@ -11,7 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func list(name string, values []string) string {
+func normalList(name string, values []string) string {
 	baseColor := lipgloss.Color("#EEEEEE")
 	base := lipgloss.NewStyle().Foreground(baseColor)
 	subtle := lipgloss.Color("#383838")
@@ -201,14 +201,14 @@ func processDetailSection(
 	}
 	staticIdSection := labeledList("", staticIdLabels, staticIdValues)
 
-	commandSection := list("Command", []string{grayText(command)})
+	commandSection := normalList("Command", []string{grayText(command)})
 
 	socketItems := []string{}
 	for _, s := range sockets {
 		socketItems = append(socketItems, formatSocketText(s, listenSocketItem, establishedSocketItem, closedSocketItem))
 	}
 	aggregated := socket.Aggregate(sockets)
-	socketSection := list(fmt.Sprintf("Sockets · %dL %dE %dC (%d)", aggregated.ListenCount, aggregated.EstablishedCount, aggregated.CloseCount, len(socketItems)), socketItems)
+	socketSection := normalList(fmt.Sprintf("Sockets · %dL %dE %dC (%d)", aggregated.ListenCount, aggregated.EstablishedCount, aggregated.CloseCount, len(socketItems)), socketItems)
 
 	ownerShipLabels := []string{"User", "Privilege"}
 	ownerShipValues := []string{
@@ -245,5 +245,18 @@ func processDetailSection(
 		Render(
 			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection, horizontalSpacer(1)),
 		)
+
 	return ui
+}
+
+func commandModal(text string) string {
+
+	modalStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("57")).
+		PaddingLeft(1).
+		PaddingRight(1).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	return modalStyle.Render(text)
 }

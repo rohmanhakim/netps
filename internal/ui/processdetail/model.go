@@ -6,6 +6,7 @@ import (
 	"netps/internal/ui/message"
 	"time"
 
+	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -32,11 +33,13 @@ type Model struct {
 
 	Sockets []socket.Socket
 
-	width, height int
-	viewport      viewport.Model
-	viewportReady bool
-	viewReady     bool
-	content       string
+	width, height  int
+	viewport       viewport.Model
+	viewportReady  bool
+	viewReady      bool
+	mode           string
+	content        string
+	sendSignalList list.Model
 }
 
 type styleFunc func(string) string
@@ -57,6 +60,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case initMsg:
+		m.mode = "DETAIL"
 		m.content = m.renderContent()
 		m.updateViewport(msg.width, msg.height)
 	case tea.WindowSizeMsg:
@@ -84,11 +88,30 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case socketHydrateMsg:
 		m.Sockets = msg.Sockets
 		rerenderContent = true
+	case sendSignalMsg:
+		m.mode = "SEND_SIGNAL"
+		m.initializeSendSignalList()
+		rerenderContent = true
+	case closeSendSignalModalMsg:
+		m.mode = "DETAIL"
+		rerenderContent = true
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			return m, func() tea.Msg {
-				return message.GoBack{}
+			if m.mode == "SEND_SIGNAL" {
+				return m, func() tea.Msg {
+					return closeSendSignalModalMsg{}
+				}
+			} else {
+				return m, func() tea.Msg {
+					return message.GoBack{}
+				}
+			}
+		case "s":
+			if m.mode == "DETAIL" {
+				return m, func() tea.Msg {
+					return sendSignalMsg{}
+				}
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -102,9 +125,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
+	if m.mode == "SEND_SIGNAL" {
+		m.sendSignalList, cmd = m.sendSignalList.Update(msg)
+	} else {
+		m.viewport, cmd = m.viewport.Update(msg)
+	}
+
 	m.viewport.SetContent(m.content)
 
-	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
@@ -116,15 +144,29 @@ func (m Model) View() tea.View {
 	if !m.viewportReady {
 		v.SetContent("\n  Initializing...")
 	} else {
-		v.SetContent(
+		var canvas *lipgloss.Canvas
+		ui := lipgloss.NewLayer(
 			fmt.Sprintf("%s\n%s\n%s",
 				m.viewport.View(),
 				actionBar(m.width),
 				statusBar(m.viewport.ScrollPercent()),
 			),
-		)
-	}
+		).Z(0)
 
+		if m.mode == "SEND_SIGNAL" {
+			signalList := m.sendSignalList
+			signalListView := signalList.View()
+			modal := commandModal(signalListView)
+			modalWidth := lipgloss.Width(modal)
+			modalHeight := lipgloss.Height((modal))
+			modalLayer := lipgloss.NewLayer(modal).X((m.width / 2) - (modalWidth / 2)).Y((m.height / 2) - (modalHeight / 2)).Z(1)
+			canvas = lipgloss.NewCanvas(ui, modalLayer)
+		} else {
+			canvas = lipgloss.NewCanvas(ui)
+		}
+
+		v.SetContent(canvas)
+	}
 	return v
 }
 
@@ -186,4 +228,41 @@ func (m *Model) updateViewport(width, height int) {
 		m.viewport.SetWidth(width)
 		m.viewport.SetHeight(height - actionBarHeight - statusBarHeight)
 	}
+}
+
+type commandListItem string
+
+func (i commandListItem) FilterValue() string { return "" }
+
+func (m *Model) initializeSendSignalList() {
+	items := []list.Item{
+		commandListItem("SIGTERM (15) · graceful termination"),
+		commandListItem("SIGKILL (9) · Immediate termination"),
+		commandListItem("SIGINT (2) · Interrupt"),
+		commandListItem("SIGHUP (1) · Reload / restart hint"),
+	}
+
+	const defaultWidth = 25
+	const listHeight = 6
+
+	l := list.New(items, commandListItemDelegate{}, defaultWidth, listHeight)
+	l.Title = "Send Signal to Process"
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.SetShowPagination(false)
+	l.DisableQuitKeybindings()
+	l.SetShowHelp(false)
+
+	m.sendSignalList = l
+	m.updateStyles()
+}
+
+func (m *Model) updateStyles() {
+	var s commandListStyles
+	s.title = lipgloss.NewStyle()
+	s.item = lipgloss.NewStyle().PaddingLeft(2)
+	s.selectedItem = lipgloss.NewStyle().Foreground(lipgloss.Color("57"))
+
+	m.sendSignalList.Styles.Title = s.title
+	m.sendSignalList.SetDelegate(commandListItemDelegate{styles: &s})
 }

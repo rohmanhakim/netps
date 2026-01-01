@@ -36,3 +36,8 @@ type initMsg struct {
 	content       string
 	width, height int
 }
+
+type sendSignalMsg struct {
+}
+
+type closeSendSignalModalMsg struct{}
