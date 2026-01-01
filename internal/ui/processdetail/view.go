@@ -108,16 +108,22 @@ func horizontalGroup(sections ...string) string {
 }
 
 func actionBar(windowWidth int) string {
-
-	statusBarStyle := lipgloss.NewStyle().
+	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#C1C6B2")).
 		Background(lipgloss.Color("#353533"))
-	statusText := lipgloss.NewStyle().Inherit(statusBarStyle)
 
-	statusVal := statusText.
+	out := style.
 		Width(windowWidth).
-		Render("[s] send signal · [c] copy · [esc] back")
-	return statusVal
+		Render("[↑↓] scroll · [s] send signal · [c] copy · [esc] back · [q] quit")
+	return out
+}
+
+func statusBar(scrollPercent float64) string {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#EEE"))
+
+	info := style.Render(fmt.Sprintf("scrolling %3.f%%", scrollPercent*100))
+	return lipgloss.JoinHorizontal(lipgloss.Center, info)
 }
 
 func horizontalSpacer(height int) string {

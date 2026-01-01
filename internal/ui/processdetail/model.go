@@ -116,7 +116,13 @@ func (m Model) View() tea.View {
 	if !m.viewportReady {
 		v.SetContent("\n  Initializing...")
 	} else {
-		v.SetContent(fmt.Sprintf("%s\n%s", m.viewport.View(), actionBar(m.width)))
+		v.SetContent(
+			fmt.Sprintf("%s\n%s\n%s",
+				m.viewport.View(),
+				actionBar(m.width),
+				statusBar(m.viewport.ScrollPercent()),
+			),
+		)
 	}
 
 	return v
@@ -171,12 +177,13 @@ func (m *Model) updateViewport(width, height int) {
 	m.width = width
 	m.height = height
 	actionBarHeight := lipgloss.Height(actionBar(m.width))
+	statusBarHeight := lipgloss.Height(statusBar(m.viewport.ScrollPercent()))
 	if !m.viewportReady {
-		m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(height-actionBarHeight))
+		m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(height-actionBarHeight-statusBarHeight))
 		m.viewport.SetContent(m.content)
 		m.viewportReady = true
 	} else {
 		m.viewport.SetWidth(width)
-		m.viewport.SetHeight(height - actionBarHeight)
+		m.viewport.SetHeight(height - actionBarHeight - statusBarHeight)
 	}
 }
