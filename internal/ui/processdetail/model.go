@@ -197,13 +197,13 @@ func (m Model) renderContent() string {
 	for _, s := range m.Sockets {
 		socketItems = append(socketItems, formatSocketText(s, listenSocketItem, establishedSocketItem, closedSocketItem))
 	}
-	socketSection := list("Section", socketItems)
+	socketSection := list("Sockets", socketItems)
 
 	ownerShipLabels := []string{"User", "Privilege"}
 	ownerShipValues := []string{
 		fmt.Sprintf("%s (%d)", m.UserName, m.UserUID),
 		m.UserPrivileged}
-	ownerSection := labeledList("Owner", ownerShipLabels, ownerShipValues)
+	ownerSection := labeledList("Ownership", ownerShipLabels, ownerShipValues)
 
 	resourceLabels := []string{
 		"Resident Memory",
