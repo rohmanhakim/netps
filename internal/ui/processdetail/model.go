@@ -82,10 +82,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case initMsg:
 		m.mode = "Process Detail"
-		m.content = m.renderContent()
+		m.content = m.renderContent(true)
 		m.updateViewport(msg.width, msg.height)
 	case tea.WindowSizeMsg:
-		m.content = m.renderContent()
+		m.content = m.renderContent(m.mode == "Process Detail")
 		m.updateViewport(msg.Width, msg.Height)
 	case detailHydratedMsg:
 		m.ExecPath = msg.ExecPath
@@ -140,7 +140,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	if rerenderContent {
-		m.content = m.renderContent()
+		m.content = m.renderContent(m.mode == "Process Detail")
+
 		if m.viewportReady {
 			m.viewport.SetContent(m.content)
 		}
@@ -204,8 +205,9 @@ func (m Model) View() tea.View {
 	return v
 }
 
-func (m Model) renderContent() string {
+func (m Model) renderContent(active bool) string {
 	return processDetailSection(
+		active,
 		m.width,
 		m.height,
 		m.Name,
@@ -293,8 +295,8 @@ func (m *Model) initializeSendSignalList() {
 
 func (m *Model) updateStyles() {
 	var s commandListStyles
-	s.title = lipgloss.NewStyle()
-	s.item = lipgloss.NewStyle().PaddingLeft(2)
+	s.title = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	s.item = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("255"))
 	s.selectedItem = lipgloss.NewStyle().Foreground(lipgloss.Color("57"))
 
 	m.sendSignalList.Styles.Title = s.title
