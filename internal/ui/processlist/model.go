@@ -10,7 +10,6 @@ import (
 
 	"os"
 	"strconv"
-	"strings"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
@@ -21,7 +20,6 @@ import (
 const HorizontalPadding = 1
 const VerticalPadding = 2
 const CellPadding = 2
-const FirstColumnWidth = 10
 
 type Model struct {
 	processSummaries []process.ProcessSummary
@@ -96,17 +94,10 @@ func (m Model) View() tea.View {
 func mapProcessItem(processSummaries []process.ProcessSummary) []table.Row {
 	var rows []table.Row
 	for _, p := range processSummaries {
-		var sb strings.Builder
-
-		_, err := fmt.Fprintf(&sb, "%dL %dE %dC", p.LSocketCount, p.ESocketCount, p.CSocketCount)
-		if err != nil {
-			panic(err)
-		}
-
 		r := table.Row{
 			strconv.Itoa(p.PID),
 			p.Name,
-			sb.String(),
+			formatSocketText(p.LSocketCount, p.ESocketCount, p.CSocketCount),
 			p.LPortsText,
 		}
 		rows = append(rows, r)
@@ -114,19 +105,33 @@ func mapProcessItem(processSummaries []process.ProcessSummary) []table.Row {
 	return rows
 }
 
+func formatSocketText(lCount int, eCount int, cCount int) string {
+	return fmt.Sprintf("%dL %dE %dC", lCount, eCount, cCount)
+}
+
 func updateTableSize(m *Model, newWidth int, newHeight int) {
-	columnsCount := len(m.table.Columns())
+	columnOrder := []string{"PID", "NAME", "SOCKS", "L.PORTS"}
 
-	newTableWidth := newWidth - (HorizontalPadding * 10)
+	newTableWidth := newWidth - (HorizontalPadding * (len(m.table.Columns()) - 1))
 	m.table.SetWidth(newTableWidth)
-	m.table.SetHeight(newHeight - (VerticalPadding * 2))
+	m.table.SetHeight(newHeight - VerticalPadding)
 
-	avgColWidth := newTableWidth / (columnsCount)
-	firstColumnWidth := newTableWidth - ((columnsCount - 1) * avgColWidth)
-	m.table.Columns()[0].Width = firstColumnWidth
-	for i := 1; i < columnsCount; i++ {
-		m.table.Columns()[i].Width = avgColWidth
+	maxFieldLenghts := maxFieldLengths(m.processSummaries)
+	columnsTotalWidth := 0
+	for _, fieldLength := range maxFieldLenghts {
+		columnsTotalWidth += fieldLength
 	}
+	lastColumnWidth := newTableWidth - columnsTotalWidth
+
+	for i, name := range columnOrder {
+		m.table.Columns()[i].Width = maxFieldLenghts[name]
+	}
+
+	for i := 0; i < len(columnOrder)-1; i++ {
+		m.table.Columns()[i].Width = maxFieldLenghts[columnOrder[i]]
+	}
+
+	m.table.Columns()[len(columnOrder)-1].Width = lastColumnWidth
 }
 
 func initializeProcessListScreen() Model {
@@ -180,4 +185,23 @@ func initializeProcessListScreen() Model {
 		processSummaries: processSummaries,
 		table:            t,
 	}
+}
+
+func maxFieldLengths(summaries []process.ProcessSummary) map[string]int {
+	if len(summaries) == 0 {
+		return nil
+	}
+	maxLens := map[string]int{
+		"PID":     3, // set initial value to column header's length
+		"NAME":    4,
+		"SOCKS":   5,
+		"L.PORTS": 7,
+	}
+	for _, p := range summaries {
+		maxLens["PID"] = max(maxLens["PID"], len(strconv.Itoa(p.PID)))
+		maxLens["NAME"] = max(maxLens["NAME"], len(p.Name))
+		maxLens["SOCKS"] = max(maxLens["SOCKS"], len(formatSocketText(p.LSocketCount, p.ESocketCount, p.CSocketCount)))
+		maxLens["L.PORTS"] = max(maxLens["L.PORTS"], len(p.LPortsText))
+	}
+	return maxLens
 }
