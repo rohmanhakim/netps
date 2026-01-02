@@ -11,6 +11,7 @@ import (
 
 func main() {
 	root := ui.New()
+
 	p := tea.NewProgram(root)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)

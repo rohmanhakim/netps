@@ -1,43 +1,76 @@
+// Invariants:
+// 1. This model hydrates exactly once.
+// 2. Table initialization happens on first WindowSizeMsg.
+// 3. Focus is forced after hydration to ensure width recalculation is rendered.
+// 4. This screen does not preserve selection across resizes.
+
 package processlist
 
 import (
 	"context"
 	"fmt"
 	"netps/internal/process"
-	"netps/internal/procfs"
-	"netps/internal/sysconf"
+	"netps/internal/ui/common"
 	"netps/internal/ui/message"
 
-	"os"
 	"strconv"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/term"
 )
 
 const HorizontalPadding = 1
 const VerticalPadding = 2
-const CellPadding = 2
 
 type Model struct {
 	processSummaries []process.ProcessSummary
 	table            table.Model
+	idleHelpItems    []string
+	ctx              context.Context
+	cancel           context.CancelFunc
+	width, height    int
 }
 
 func New() Model {
-	return initializeProcessListScreen()
+	idleHelpItems := []string{
+		"[↑↓] scroll",
+		"[s] send signal",
+		"[c] copy",
+		"[esc] back",
+		"[q] quit",
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	return Model{
+		idleHelpItems: idleHelpItems,
+		ctx:           ctx,
+		cancel:        cancel,
+	}
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd {
+	return tea.Batch(
+		HydrateRunningProcesses(m.ctx),
+	)
+}
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		updateTableSize(&m, msg.Width, msg.Height)
+		if len(m.table.Columns()) == 0 {
+			m.table = m.initProcessTable()
+		}
+		m.updateWindowSize(msg.Width, msg.Height)
+		m.updateTableSize(msg.Width, msg.Height)
+	case processSummariesLoadedMsg:
+		m.updateTableRows(msg.ProcessSummaries)
+		m.updateTableSize(m.width, m.height)
+		m.table.Focus() // Safe to auto-focus: if not, the table won't update the screen with the new width from updateTableSize unless you resize the terminal
+	case hydrationErrorMsg:
+		m.cancel()
+		return m, tea.Quit // might later add an error view. No action needed now.
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
@@ -47,16 +80,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.table.Focus()
 			}
 		case "q", "ctrl+c":
+			m.cancel()
 			return m, tea.Quit
 		case "enter":
-			pid, err := strconv.Atoi(m.table.SelectedRow()[0])
+			row := m.table.SelectedRow()
+			if len(row) == 0 {
+				return m, nil
+			}
+			pid, err := strconv.Atoi(row[0])
 			if err != nil {
-				panic(err)
+				return m, func() tea.Msg {
+					return hydrationErrorMsg{Error: err}
+				}
 			}
 			return m, func() tea.Msg {
 				return message.GoToProcessDetail{
 					PID:  pid,
-					Name: m.table.SelectedRow()[1],
+					Name: row[1],
 				}
 			}
 		}
@@ -70,24 +110,9 @@ func (m Model) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
-	w, h, err := term.GetSize(uintptr(os.Stdout.Fd()))
-
-	footerStyle := lipgloss.NewStyle().
-		Align(lipgloss.Center).
-		Foreground(lipgloss.Color("#FFFFFF"))
-
-	statusBar := footerStyle.Render("[↑↓] select · [Enter] inspect · [q] quit · [s] sort · [f] filter")
-	newHeight := h - lipgloss.Height(statusBar)
-	if err == nil {
-		updateTableSize(&m, w, newHeight)
-		baseStyle = baseStyle.Height(newHeight).Width(w)
-	}
-
-	m.table.Focus()
-
-	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n")
+	actionBar := common.ActionBar(m.width, m.idleHelpItems)
+	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + actionBar + "\n")
 	v.AltScreen = true
-
 	return v
 }
 
@@ -109,63 +134,41 @@ func formatSocketText(lCount int, eCount int, cCount int) string {
 	return fmt.Sprintf("%dL %dE %dC", lCount, eCount, cCount)
 }
 
-func updateTableSize(m *Model, newWidth int, newHeight int) {
-	columnOrder := []string{"PID", "NAME", "SOCKS", "L.PORTS"}
+func (m *Model) updateWindowSize(w int, h int) {
+	m.width = w
+	m.height = h
+}
 
+func (m *Model) updateTableSize(newWidth int, newHeight int) {
 	newTableWidth := newWidth - (HorizontalPadding * (len(m.table.Columns()) - 1))
 	m.table.SetWidth(newTableWidth)
-	m.table.SetHeight(newHeight - VerticalPadding)
+	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
+	m.table.SetHeight(newHeight - VerticalPadding - actionBarHeight)
 
 	maxFieldLenghts := maxFieldLengths(m.processSummaries)
 	columnsTotalWidth := 0
 	for _, fieldLength := range maxFieldLenghts {
 		columnsTotalWidth += fieldLength
 	}
-	lastColumnWidth := newTableWidth - columnsTotalWidth
+	lastColumnWidth := max(1, newTableWidth-columnsTotalWidth)
 
-	for i, name := range columnOrder {
-		m.table.Columns()[i].Width = maxFieldLenghts[name]
+	for i := 0; i < len(m.table.Columns())-1; i++ {
+		title := m.table.Columns()[i].Title
+		m.table.Columns()[i].Width = maxFieldLenghts[title]
 	}
 
-	for i := 0; i < len(columnOrder)-1; i++ {
-		m.table.Columns()[i].Width = maxFieldLenghts[columnOrder[i]]
-	}
-
-	m.table.Columns()[len(columnOrder)-1].Width = lastColumnWidth
+	m.table.Columns()[len(m.table.Columns())-1].Width = lastColumnWidth
 }
 
-func initializeProcessListScreen() Model {
-
-	procfsClient := procfs.NewClient()
-	sysconfClient := sysconf.NewClient()
-
-	service := process.NewService(
-		procfsClient,
-		procfsClient,
-		sysconfClient,
-		sysconfClient,
-		procfsClient,
-		procfsClient,
-		procfsClient,
-	)
-	processSummaries, err := service.GetRunningSummaries(context.Background())
-
-	if err != nil {
-		panic(err)
-	}
-
+func (m *Model) initProcessTable() table.Model {
 	columns := []table.Column{
 		{Title: "PID"},
 		{Title: "NAME"},
 		{Title: "SOCKS"},
 		{Title: "L.PORTS"},
 	}
-
-	rows := mapProcessItem(processSummaries)
-
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
 		table.WithFocused(true),
 	)
 
@@ -180,22 +183,24 @@ func initializeProcessListScreen() Model {
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
+	return t
+}
 
-	return Model{
-		processSummaries: processSummaries,
-		table:            t,
-	}
+func (m *Model) updateTableRows(summaries []process.ProcessSummary) {
+	m.processSummaries = summaries
+	rows := mapProcessItem(summaries)
+	m.table.SetRows(rows)
 }
 
 func maxFieldLengths(summaries []process.ProcessSummary) map[string]int {
-	if len(summaries) == 0 {
-		return nil
-	}
 	maxLens := map[string]int{
 		"PID":     3, // set initial value to column header's length
 		"NAME":    4,
 		"SOCKS":   5,
 		"L.PORTS": 7,
+	}
+	if len(summaries) == 0 {
+		return maxLens
 	}
 	for _, p := range summaries {
 		maxLens["PID"] = max(maxLens["PID"], len(strconv.Itoa(p.PID)))

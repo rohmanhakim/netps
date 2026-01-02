@@ -30,7 +30,11 @@ func New() Root {
 	}
 }
 
-func (m Root) Init() tea.Cmd { return nil }
+func (m Root) Init() tea.Cmd {
+	return func() tea.Msg {
+		return message.GoBack{}
+	}
+}
 
 func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -47,10 +51,9 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			processdetail.HydrateUser(msg.PID),
 			processdetail.HydrateSockets(msg.PID),
 		)
-
 	case message.GoBack:
 		m.screen = ScreenProcessList
-		return m, nil
+		return m, m.processList.Init()
 	}
 
 	// delegate update

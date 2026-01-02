@@ -3,6 +3,7 @@ package processdetail
 import (
 	"fmt"
 	"netps/internal/socket"
+	"netps/internal/ui/common"
 	"netps/internal/ui/message"
 	"time"
 
@@ -182,8 +183,8 @@ func (m Model) View() tea.View {
 			ui = lipgloss.NewLayer(
 				fmt.Sprintf("%s\n%s\n%s",
 					m.viewport.View(),
-					statusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
-					actionBar(m.width, m.sendSignalHelpItems),
+					common.StatusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
+					common.ActionBar(m.width, m.sendSignalHelpItems),
 				),
 			).Z(0)
 
@@ -192,8 +193,8 @@ func (m Model) View() tea.View {
 			ui = lipgloss.NewLayer(
 				fmt.Sprintf("%s\n%s\n%s",
 					m.viewport.View(),
-					statusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
-					actionBar(m.width, m.idleHelpItems),
+					common.StatusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
+					common.ActionBar(m.width, m.idleHelpItems),
 				),
 			).Z(0)
 
@@ -254,8 +255,8 @@ func Initialize(width, height int) tea.Cmd {
 func (m *Model) updateViewport(width, height int) {
 	m.width = width
 	m.height = height
-	actionBarHeight := lipgloss.Height(actionBar(m.width, m.idleHelpItems))
-	statusBarHeight := lipgloss.Height(statusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()))
+	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
+	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()))
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(height-actionBarHeight-statusBarHeight))
 		m.viewport.SetContent(m.content)

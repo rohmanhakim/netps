@@ -1,7 +1,5 @@
 package socket
 
-import "log"
-
 type Socket struct {
 	Proto string
 	Addr  string
@@ -34,8 +32,6 @@ func Aggregate(socks []Socket) AggregatedSockets {
 			aggregated.EstablishedCount++
 		case "CLOSE":
 			aggregated.CloseCount++
-		default:
-			log.Printf("Unknown socket state: %s", socket.State)
 		}
 	}
 	return aggregated

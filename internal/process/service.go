@@ -15,6 +15,30 @@ type Service struct {
 	user      UserSource
 }
 
+type Config struct {
+	Process   SummarySource
+	Detail    DetailSource
+	Clocktick ClockTickSource
+	PageSize  PageSizeSource
+	UpTime    UpTimeSource
+	Resource  ResourceSource
+	User      UserSource
+}
+
+func NewProcessService(
+	cfg Config,
+) *Service {
+	return &Service{
+		process:   cfg.Process,
+		detail:    cfg.Detail,
+		clocktick: cfg.Clocktick,
+		pageSize:  cfg.PageSize,
+		upTime:    cfg.UpTime,
+		resource:  cfg.Resource,
+		user:      cfg.User,
+	}
+}
+
 func NewService(
 	proc SummarySource,
 	detail DetailSource,
