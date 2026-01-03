@@ -30,6 +30,8 @@ type Model struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	width, height    int
+	mode             string
+	modeColor        string
 }
 
 func New() Model {
@@ -42,6 +44,7 @@ func New() Model {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return Model{
+		mode:          "Process List",
 		idleHelpItems: idleHelpItems,
 		ctx:           ctx,
 		cancel:        cancel,
@@ -102,6 +105,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
+	if m.mode == "Process List" {
+		m.modeColor = "243"
+	} else {
+		m.modeColor = "57"
+	}
+
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
 }
@@ -110,8 +119,9 @@ func (m Model) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
+	statusBar := common.StatusBar(m.width, m.mode, m.modeColor, 0)
 	actionBar := common.ActionBar(m.width, m.idleHelpItems)
-	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + actionBar + "\n")
+	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n" + actionBar + "\n")
 	v.AltScreen = true
 	return v
 }
@@ -142,8 +152,9 @@ func (m *Model) updateWindowSize(w int, h int) {
 func (m *Model) updateTableSize(newWidth int, newHeight int) {
 	newTableWidth := newWidth - (HorizontalPadding * (len(m.table.Columns()) - 1))
 	m.table.SetWidth(newTableWidth)
+	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, 0))
 	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
-	m.table.SetHeight(newHeight - VerticalPadding - actionBarHeight)
+	m.table.SetHeight(newHeight - VerticalPadding - statusBarHeight - actionBarHeight)
 
 	maxFieldLenghts := maxFieldLengths(m.processSummaries)
 	columnsTotalWidth := 0
