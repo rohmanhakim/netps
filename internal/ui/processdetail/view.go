@@ -15,6 +15,7 @@ import (
 
 func normalList(active bool, inactiveColor color.Color, name string, values []string) string {
 	baseForegroundColor := lipgloss.Color("255")
+	darkCharcoalColor := lipgloss.Color("236")
 
 	var baseStyle lipgloss.Style
 	if active {
@@ -26,7 +27,7 @@ func normalList(active bool, inactiveColor color.Color, name string, values []st
 	listHeader := baseStyle.
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
-		BorderForeground(lipgloss.Color("236")).
+		BorderForeground(darkCharcoalColor).
 		MarginTop(1).
 		Render
 
@@ -46,6 +47,7 @@ func normalList(active bool, inactiveColor color.Color, name string, values []st
 func labeledList(active bool, inactiveColor color.Color, name string, labels []string, values []string) string {
 	baseForegroundColor := lipgloss.Color("255")
 	darkGrayColor := lipgloss.Color("248")
+	darkCharcoalColor := lipgloss.Color("236")
 
 	var baseStyle, subtleStyle lipgloss.Style
 	if active {
@@ -65,7 +67,7 @@ func labeledList(active bool, inactiveColor color.Color, name string, labels []s
 	listHeader := baseStyle.
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
-		BorderForeground(darkGrayColor).
+		BorderForeground(darkCharcoalColor).
 		MarginTop(1).
 		Render
 
