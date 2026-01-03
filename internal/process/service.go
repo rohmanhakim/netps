@@ -39,26 +39,6 @@ func NewProcessService(
 	}
 }
 
-func NewService(
-	proc SummarySource,
-	detail DetailSource,
-	clocktick ClockTickSource,
-	pageSize PageSizeSource,
-	upTime UpTimeSource,
-	resource ResourceSource,
-	user UserSource,
-) *Service {
-	return &Service{
-		process:   proc,
-		detail:    detail,
-		clocktick: clocktick,
-		pageSize:  pageSize,
-		upTime:    upTime,
-		resource:  resource,
-		user:      user,
-	}
-}
-
 func (s *Service) GetRunningSummaries(ctx context.Context) ([]ProcessSummary, error) {
 	procSum, err := s.process.ListRunnings(ctx)
 

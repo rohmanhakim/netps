@@ -14,17 +14,17 @@ func HydrateStaticIds(pid int) tea.Cmd {
 	return func() tea.Msg {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
-
-		procesService := process.NewService(
-			procfsClient,
-			procfsClient,
-			sysconfClient,
-			sysconfClient,
-			procfsClient,
-			procfsClient,
-			procfsClient,
-		)
-		processDetail, err := procesService.GetProcessDetail(context.Background(), pid)
+		cfg := process.Config{
+			Process:   procfsClient,
+			Detail:    procfsClient,
+			Clocktick: sysconfClient,
+			PageSize:  sysconfClient,
+			UpTime:    procfsClient,
+			Resource:  procfsClient,
+			User:      procfsClient,
+		}
+		processService := process.NewProcessService(cfg)
+		processDetail, err := processService.GetProcessDetail(context.Background(), pid)
 		if err != nil {
 			panic(err)
 		}
@@ -43,16 +43,16 @@ func HydrateResource(pid int) tea.Cmd {
 	return func() tea.Msg {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
-
-		processService := process.NewService(
-			procfsClient,
-			procfsClient,
-			sysconfClient,
-			sysconfClient,
-			procfsClient,
-			procfsClient,
-			procfsClient,
-		)
+		cfg := process.Config{
+			Process:   procfsClient,
+			Detail:    procfsClient,
+			Clocktick: sysconfClient,
+			PageSize:  sysconfClient,
+			UpTime:    procfsClient,
+			Resource:  procfsClient,
+			User:      procfsClient,
+		}
+		processService := process.NewProcessService(cfg)
 		processResource, err := processService.GetProcessResource(context.Background(), pid)
 		if err != nil {
 			panic(err)
@@ -72,16 +72,16 @@ func HydrateUser(pid int) tea.Cmd {
 	return func() tea.Msg {
 		procfsClient := procfs.NewClient()
 		sysconfClient := sysconf.NewClient()
-
-		processService := process.NewService(
-			procfsClient,
-			procfsClient,
-			sysconfClient,
-			sysconfClient,
-			procfsClient,
-			procfsClient,
-			procfsClient,
-		)
+		cfg := process.Config{
+			Process:   procfsClient,
+			Detail:    procfsClient,
+			Clocktick: sysconfClient,
+			PageSize:  sysconfClient,
+			UpTime:    procfsClient,
+			Resource:  procfsClient,
+			User:      procfsClient,
+		}
+		processService := process.NewProcessService(cfg)
 
 		processUser, err := processService.GetUser(context.Background(), pid)
 		if err != nil {
