@@ -264,7 +264,7 @@ func processDetailSection(
 		Height(contentHeight).
 		Width(width - baseForegroundStyle.GetHorizontalFrameSize()).
 		Render(
-			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection, horizontalSpacer(1)),
+			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection),
 		)
 
 	return ui

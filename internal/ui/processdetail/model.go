@@ -5,6 +5,7 @@ import (
 	"netps/internal/socket"
 	"netps/internal/ui/common"
 	"netps/internal/ui/message"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/list"
@@ -183,7 +184,7 @@ func (m Model) View() tea.View {
 			ui = lipgloss.NewLayer(
 				fmt.Sprintf("%s\n%s\n%s",
 					m.viewport.View(),
-					common.StatusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
+					common.StatusBar(m.width, m.mode, m.modeColor, m.getStatusBarInfo()),
 					common.ActionBar(m.width, m.sendSignalHelpItems),
 				),
 			).Z(0)
@@ -193,7 +194,7 @@ func (m Model) View() tea.View {
 			ui = lipgloss.NewLayer(
 				fmt.Sprintf("%s\n%s\n%s",
 					m.viewport.View(),
-					common.StatusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()),
+					common.StatusBar(m.width, m.mode, m.modeColor, m.getStatusBarInfo()),
 					common.ActionBar(m.width, m.idleHelpItems),
 				),
 			).Z(0)
@@ -207,7 +208,7 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) renderContent(active bool) string {
-	return processDetailSection(
+	ui := processDetailSection(
 		active,
 		m.width,
 		m.height,
@@ -228,6 +229,8 @@ func (m Model) renderContent(active bool) string {
 		m.UTime,
 		m.STime,
 	)
+	trimmed := strings.TrimSpace(ui)
+	return trimmed
 }
 
 func formatSocketText(sock socket.Socket, lStyle styleFunc, eStyle styleFunc, cStyle styleFunc) string {
@@ -256,7 +259,8 @@ func (m *Model) updateViewport(width, height int) {
 	m.width = width
 	m.height = height
 	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
-	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, m.viewport.ScrollPercent()))
+
+	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, m.getStatusBarInfo()))
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(height-actionBarHeight-statusBarHeight))
 		m.viewport.SetContent(m.content)
@@ -302,4 +306,20 @@ func (m *Model) updateStyles() {
 
 	m.sendSignalList.Styles.Title = s.title
 	m.sendSignalList.SetDelegate(commandListItemDelegate{styles: &s})
+}
+
+func (m *Model) getVisibleContentPercent() float64 {
+	totalLines := m.viewport.TotalLineCount()
+	if totalLines == 0 {
+		return 0
+	}
+	return min(100, float64(m.viewport.Height())/float64(totalLines)*100)
+}
+
+func (m *Model) getScrollingPercent() float64 {
+	return m.viewport.ScrollPercent() * 100
+}
+
+func (m *Model) getStatusBarInfo() string {
+	return fmt.Sprintf("scrolling %3.f%% · showing %3.f%%", m.getScrollingPercent(), m.getVisibleContentPercent())
 }

@@ -1,7 +1,6 @@
 package common
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -14,11 +13,10 @@ func ActionBar(windowWidth int, actions []string) string {
 	out := style.
 		Width(windowWidth).
 		Render(strings.Join(actions, " · "))
-		// Render("[↑↓] scroll · [s] send signal · [c] copy · [esc] back · [q] quit")
 	return out
 }
 
-func StatusBar(windowWidth int, modeName string, modeColor string, scrollPercent float64) string {
+func StatusBar(windowWidth int, modeName string, modeColor string, rightInfo string) string {
 	scrollingInfoStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("237")).
 		Foreground(lipgloss.Color("#C1C6B2"))
@@ -30,7 +28,7 @@ func StatusBar(windowWidth int, modeName string, modeColor string, scrollPercent
 
 	mode := modeStyle.Render(modeName)
 	info := scrollingInfoStyle.
-		Render(fmt.Sprintf("scrolling %3.f%%", scrollPercent*100))
+		Render(rightInfo)
 	lineStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("237"))
 	line := lineStyle.

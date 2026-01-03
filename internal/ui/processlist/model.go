@@ -121,7 +121,8 @@ func (m Model) View() tea.View {
 	var baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
-	statusBar := common.StatusBar(m.width, m.mode, m.modeColor, 0)
+	processCount := fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries))
+	statusBar := common.StatusBar(m.width, m.mode, m.modeColor, processCount)
 	actionBar := common.ActionBar(m.width, m.idleHelpItems)
 	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n" + actionBar + "\n")
 	v.AltScreen = true
@@ -154,7 +155,9 @@ func (m *Model) updateWindowSize(w int, h int) {
 func (m *Model) updateTableSize(newWidth int, newHeight int) {
 	newTableWidth := newWidth - (HorizontalPadding * (len(m.table.Columns()) - 1))
 	m.table.SetWidth(newTableWidth)
-	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, 0))
+	processCount := fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries))
+
+	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, processCount))
 	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
 	m.table.SetHeight(newHeight - VerticalPadding - statusBarHeight - actionBarHeight)
 
@@ -222,4 +225,12 @@ func maxFieldLengths(summaries []process.ProcessSummary) map[string]int {
 		maxLens["L.PORTS"] = max(maxLens["L.PORTS"], len(p.LPortsText))
 	}
 	return maxLens
+}
+
+func (m Model) getShowingProcessCount() int {
+	processCount := len(m.processSummaries)
+	tableHeight := m.table.Height()
+
+	showingProcessCount := min(processCount, tableHeight)
+	return showingProcessCount
 }
