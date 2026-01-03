@@ -53,8 +53,9 @@ func New() Model {
 	}
 }
 
-func (m Model) Init() tea.Cmd {
+func (m Model) Init(w, h int) tea.Cmd {
 	return tea.Batch(
+		InitWindow(w, h),
 		HydrateRunningProcesses(m.ctx),
 	)
 }
@@ -65,10 +66,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		if len(m.table.Columns()) == 0 {
-			m.table = m.initProcessTable()
+			m.table = m.initProcessTable() // init the table here because tea.WindowSizeMsg is the first message to be triggered for some reason
 		}
 		m.updateWindowSize(msg.Width, msg.Height)
 		m.updateTableSize(msg.Width, msg.Height)
+	case initMsg:
+		m.updateWindowSize(msg.Width, msg.Height)
+		m.updateTableSize(m.width, m.height) // need to update so that it recalculates table size after back from detail screen
 	case processSummariesLoadedMsg:
 		m.updateTableRows(msg.ProcessSummaries)
 		m.updateTableSize(m.width, m.height)

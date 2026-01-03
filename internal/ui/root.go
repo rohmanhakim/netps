@@ -53,7 +53,7 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 	case message.GoBack:
 		m.screen = ScreenProcessList
-		return m, m.processList.Init()
+		return m, m.processList.Init(m.width, m.height)
 	}
 
 	// delegate update

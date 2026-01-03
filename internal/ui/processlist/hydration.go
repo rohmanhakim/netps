@@ -9,6 +9,15 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+func InitWindow(w, h int) tea.Cmd {
+	return func() tea.Msg {
+		return initMsg{
+			Width:  w,
+			Height: h,
+		}
+	}
+}
+
 func HydrateRunningProcesses(ctx context.Context) tea.Cmd {
 	return func() tea.Msg {
 		procfsClient := procfs.NewClient()
