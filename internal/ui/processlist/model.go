@@ -36,10 +36,12 @@ type Model struct {
 
 func New() Model {
 	idleHelpItems := []string{
-		"[↑↓] scroll",
+		"[↑↓] select",
+		"[m] mult.select",
+		"[i] inspect",
 		"[s] send signal",
-		"[c] copy",
-		"[esc] back",
+		"[f] filter",
+		"[o] order",
 		"[q] quit",
 	}
 	ctx, cancel := context.WithCancel(context.Background())
