@@ -14,7 +14,7 @@ func NewService(
 	}
 }
 
-func (s *Service) GetSocketsByStates(ctx context.Context, pid int, states []string) ([]Socket, error) {
+func (s *Service) GetSocketsByStates(ctx context.Context, pid int, states []SocketState) ([]Socket, error) {
 	sockets, err := s.socket.SocketsByStates(ctx, pid, states)
 	if err != nil {
 		return []Socket{}, nil

@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+
 	root := ui.New()
 
 	p := tea.NewProgram(root)

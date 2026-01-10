@@ -1,10 +1,28 @@
 package socket
 
+type SocketState string
+
+const (
+	StateEstablished SocketState = "ESTABLISHED"
+	StateSynSent     SocketState = "SYN_SENT"
+	StateSynRecv     SocketState = "SYN_RECV"
+	StateFinWait1    SocketState = "FIN_WAIT1"
+	StateFinWait2    SocketState = "FIN_WAIT2"
+	StateTimeWait1   SocketState = "TIME_WAIT"
+	StateClose       SocketState = "CLOSE"
+	StateCloseWait   SocketState = "CLOSE_WAIT"
+	StateLastAck     SocketState = "LAST_ACK"
+	StateListen      SocketState = "LISTEN"
+	StateClosing     SocketState = "CLOSING"
+	StateNewSynRecv  SocketState = "NEW_SYN_RECV"
+	StateUnknown     SocketState = "UNKNOWN"
+)
+
 type Socket struct {
 	Proto string
 	Addr  string
 	Port  int
-	State string
+	State SocketState
 }
 
 type AggregatedSockets struct {
@@ -13,7 +31,7 @@ type AggregatedSockets struct {
 	CloseCount       int
 }
 
-func NewSocketInfo(proto, addr string, port int, state string) *Socket {
+func NewSocketInfo(proto, addr string, port int, state SocketState) *Socket {
 	return &Socket{
 		Proto: proto,
 		Addr:  addr,
@@ -26,11 +44,11 @@ func Aggregate(socks []Socket) AggregatedSockets {
 	aggregated := AggregatedSockets{}
 	for _, socket := range socks {
 		switch socket.State {
-		case "LISTEN":
+		case StateListen:
 			aggregated.ListenCount++
-		case "ESTABLISHED":
+		case StateEstablished:
 			aggregated.EstablishedCount++
-		case "CLOSE":
+		case StateClose:
 			aggregated.CloseCount++
 		}
 	}

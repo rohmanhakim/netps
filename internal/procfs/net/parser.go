@@ -32,7 +32,7 @@ func ParseSockets(pid int) ([]socket.Socket, error) {
 	return sockets, nil
 }
 
-func ParseSocketsByStates(pid int, state []string) ([]socket.Socket, error) {
+func ParseSocketsByStates(pid int, state []socket.SocketState) ([]socket.Socket, error) {
 	socks, err := ParseSockets(pid)
 	if err != nil {
 		return []socket.Socket{}, err
@@ -137,34 +137,34 @@ func parseHexAddr(s string) (string, int, error) {
 	return ip.String(), int(port64), nil
 }
 
-func parseState(state string) string {
+func parseState(state string) socket.SocketState {
 	switch state {
 	case "01":
-		return "ESTABLISHED"
+		return socket.StateEstablished
 	case "02":
-		return "SYN_SENT"
+		return socket.StateSynSent
 	case "03":
-		return "SYN_RECV"
+		return socket.StateSynRecv
 	case "04":
-		return "FIN_WAIT1"
+		return socket.StateFinWait1
 	case "05":
-		return "FIN_WAIT2"
+		return socket.StateFinWait2
 	case "06":
-		return "TIME_WAIT"
+		return socket.StateTimeWait1
 	case "07":
-		return "CLOSE"
+		return socket.StateClose
 	case "08":
-		return "CLOSE_WAIT"
+		return socket.StateCloseWait
 	case "09":
-		return "LAST_ACK"
+		return socket.StateLastAck
 	case "0A":
-		return "LISTEN"
+		return socket.StateListen
 	case "0B":
-		return "CLOSING"
+		return socket.StateClosing
 	case "0C":
-		return "NEW_SYN_RECV"
+		return socket.StateNewSynRecv
 	default:
-		return "UNKNOWN"
+		return socket.StateUnknown
 	}
 }
 
@@ -263,7 +263,7 @@ func getInodes(pid int) ([]uint64, error) {
 	return result, nil
 }
 
-func filterSockets(socks []socket.Socket, states []string) []socket.Socket {
+func filterSockets(socks []socket.Socket, states []socket.SocketState) []socket.Socket {
 	filtered := []socket.Socket{}
 	for _, sock := range socks {
 		if slices.Contains(states, sock.State) {

@@ -13,7 +13,13 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func normalList(active bool, inactiveColor color.Color, name string, values []string) string {
+func normalList(
+	active bool,
+	theme common.Theme,
+	inactiveColor color.Color,
+	name string,
+	values []string,
+) string {
 	baseForegroundColor := lipgloss.Color("255")
 	darkCharcoalColor := lipgloss.Color("236")
 
@@ -28,7 +34,7 @@ func normalList(active bool, inactiveColor color.Color, name string, values []st
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
 		BorderForeground(darkCharcoalColor).
-		MarginTop(1).
+		MarginTop(theme.SpacingSmall).
 		Render
 
 	v := lipgloss.JoinVertical(lipgloss.Left,
@@ -44,15 +50,22 @@ func normalList(active bool, inactiveColor color.Color, name string, values []st
 	return v
 }
 
-func labeledList(active bool, inactiveColor color.Color, name string, labels []string, values []string) string {
-	baseForegroundColor := lipgloss.Color("255")
-	darkGrayColor := lipgloss.Color("248")
-	darkCharcoalColor := lipgloss.Color("236")
+func labeledList(
+	active bool,
+	theme common.Theme,
+	inactiveColor color.Color,
+	name string,
+	labels []string,
+	values []string,
+) string {
+	baseForegroundColor := lipgloss.Color(theme.ColorForegroundBase)
+	subtleForegroundColor := lipgloss.Color(theme.ColorForegroundSubtle)
+	darkCharcoalColor := lipgloss.Color(theme.ColorInactive)
 
 	var baseStyle, subtleStyle lipgloss.Style
 	if active {
 		baseStyle = lipgloss.NewStyle().Foreground(baseForegroundColor)
-		subtleStyle = lipgloss.NewStyle().Foreground(darkGrayColor)
+		subtleStyle = lipgloss.NewStyle().Foreground(subtleForegroundColor)
 	} else {
 		baseStyle = lipgloss.NewStyle().Foreground(inactiveColor)
 		subtleStyle = lipgloss.NewStyle().Foreground(inactiveColor)
@@ -68,7 +81,7 @@ func labeledList(active bool, inactiveColor color.Color, name string, labels []s
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
 		BorderForeground(darkCharcoalColor).
-		MarginTop(1).
+		MarginTop(theme.SpacingSmall).
 		Render
 
 	styledLabels := []string{}
@@ -76,13 +89,13 @@ func labeledList(active bool, inactiveColor color.Color, name string, labels []s
 		styledLabels = append(styledLabels, grayText(l))
 	}
 	styledValues := []string{}
-	for _, t := range values {
-		styledValues = append(styledValues, whiteText(t))
+	for _, val := range values {
+		styledValues = append(styledValues, whiteText(val))
 	}
 
 	var v string
 	if strings.TrimSpace(name) == "" {
-		v = baseStyle.MarginTop(1).Render(lipgloss.JoinHorizontal(
+		v = baseStyle.MarginTop(theme.SpacingSmall).Render(lipgloss.JoinHorizontal(
 			lipgloss.Top,
 			lipgloss.JoinVertical(lipgloss.Left,
 				styledLabels...,
@@ -115,8 +128,8 @@ func verticalGroup(sections ...string) string {
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
-func horizontalGroup(sections ...string) string {
-	container := lipgloss.NewStyle().MarginRight(2)
+func horizontalGroup(theme common.Theme, sections ...string) string {
+	container := lipgloss.NewStyle().MarginRight(theme.SpacingMedium)
 	margined := []string{}
 	for _, s := range sections {
 		margined = append(margined, container.Render(s))
@@ -124,16 +137,10 @@ func horizontalGroup(sections ...string) string {
 	return container.Render(lipgloss.JoinHorizontal(lipgloss.Top, margined...))
 }
 
-func horizontalSpacer(height int) string {
-	hSpacer := lipgloss.NewStyle().
-		Height(height)
-	return hSpacer.Render()
-}
-
 func processDetailSection(
 	active bool,
+	theme common.Theme,
 	width int,
-	height int,
 	name string,
 	pid int,
 	execPath string,
@@ -152,29 +159,29 @@ func processDetailSection(
 	sTime time.Duration,
 ) string {
 
-	whiteColor := lipgloss.Color("255")
-	grayColor := lipgloss.Color("248")
-	canaryColor := lipgloss.Color("191")
-	blueJeansColor := lipgloss.Color("75")
-	darkCharcoalColor := lipgloss.Color("236")
+	baseForegroundColor := lipgloss.Color(theme.ColorForegroundBase) // COlorWhite
+	subtleForegroundColor := lipgloss.Color(theme.ColorForegroundSubtle)
+	positiveColor := lipgloss.Color(theme.ColorSuccess)
+	neutralColor := lipgloss.Color(theme.ColorNeutral)
+	inactiveColor := lipgloss.Color(theme.ColorInactive)
 
 	var baseForegroundStyle, subtleForegroundStyle lipgloss.Style
 
 	if active {
-		baseForegroundStyle = lipgloss.NewStyle().Foreground(whiteColor)
-		subtleForegroundStyle = lipgloss.NewStyle().Foreground(grayColor)
+		baseForegroundStyle = lipgloss.NewStyle().Foreground(baseForegroundColor)
+		subtleForegroundStyle = lipgloss.NewStyle().Foreground(subtleForegroundColor)
 	} else {
-		baseForegroundStyle = lipgloss.NewStyle().Foreground(darkCharcoalColor)
-		subtleForegroundStyle = lipgloss.NewStyle().Foreground(darkCharcoalColor)
+		baseForegroundStyle = lipgloss.NewStyle().Foreground(inactiveColor)
+		subtleForegroundStyle = lipgloss.NewStyle().Foreground(inactiveColor)
 	}
 
-	var positiveColor, neutralColor color.Color
+	var positiveBulletColor, neutralBulletColor color.Color
 	if active {
-		positiveColor = canaryColor
-		neutralColor = blueJeansColor
+		positiveBulletColor = positiveColor
+		neutralBulletColor = neutralColor
 	} else {
-		positiveColor = darkCharcoalColor
-		neutralColor = darkCharcoalColor
+		positiveBulletColor = inactiveColor
+		neutralBulletColor = inactiveColor
 	}
 
 	var baseForegroundText, subtleForegroundText func(strs ...string) string
@@ -183,18 +190,18 @@ func processDetailSection(
 	subtleForegroundText = subtleForegroundStyle.Render
 
 	positiveBullet := lipgloss.NewStyle().SetString("•").
-		Foreground(positiveColor).
-		PaddingRight(1).
+		Foreground(positiveBulletColor).
+		PaddingRight(theme.SpacingSmall).
 		String()
 
 	neutralBullet := lipgloss.NewStyle().SetString("•").
-		Foreground(neutralColor).
-		PaddingRight(1).
+		Foreground(neutralBulletColor).
+		PaddingRight(theme.SpacingSmall).
 		String()
 
 	idleBullet := lipgloss.NewStyle().SetString("•").
-		Foreground(darkCharcoalColor).
-		PaddingRight(1).
+		Foreground(inactiveColor).
+		PaddingRight(theme.SpacingSmall).
 		String()
 
 	listenSocketItem := func(s string) string {
@@ -219,9 +226,9 @@ func processDetailSection(
 		execPath,
 		fmt.Sprintf("%s (%d)", parentName, ppid),
 	}
-	staticIdSection := labeledList(active, darkCharcoalColor, "", staticIdLabels, staticIdValues)
+	staticIdSection := labeledList(active, theme, lipgloss.Color(theme.ColorInactive), "", staticIdLabels, staticIdValues)
 
-	commandSection := normalList(active, darkCharcoalColor, "Command", []string{subtleForegroundText(command)})
+	commandSection := normalList(active, theme, lipgloss.Color(theme.ColorInactive), "Command", []string{subtleForegroundText(command)})
 
 	socketItems := []string{}
 	for _, s := range sockets {
@@ -229,13 +236,13 @@ func processDetailSection(
 	}
 	aggregated := socket.Aggregate(sockets)
 	socket := fmt.Sprintf("Sockets · %dL %dE %dC (%d)", aggregated.ListenCount, aggregated.EstablishedCount, aggregated.CloseCount, len(socketItems))
-	socketSection := normalList(active, darkCharcoalColor, socket, socketItems)
+	socketSection := normalList(active, theme, lipgloss.Color(theme.ColorInactive), socket, socketItems)
 
 	ownerShipLabels := []string{"User", "Privilege"}
 	ownerShipValues := []string{
 		fmt.Sprintf("%s (%d)", userName, userUid),
 		userPrivileged}
-	ownerSection := labeledList(active, darkCharcoalColor, "Ownership", ownerShipLabels, ownerShipValues)
+	ownerSection := labeledList(active, theme, lipgloss.Color(theme.ColorInactive), "Ownership", ownerShipLabels, ownerShipValues)
 
 	resourceLabels := []string{
 		"Resident Memory",
@@ -251,17 +258,16 @@ func processDetailSection(
 		util.DurationToHHMMSS(elapsedTime),
 		util.DurationToHHMMSS(uTime),
 		util.DurationToHHMMSS(sTime)}
-	resourceSection := labeledList(active, darkCharcoalColor, "Resources", resourceLabels, resourceValues)
+	resourceSection := labeledList(active, theme, lipgloss.Color(theme.ColorInactive), "Resources", resourceLabels, resourceValues)
 
 	firstSection := verticalGroup(staticIdSection, commandSection)
 	secondSection := horizontalGroup(
+		theme,
 		verticalGroup(resourceSection, ownerSection),
 		verticalGroup(socketSection),
 	)
 
-	contentHeight := height - lipgloss.Height(common.ActionBar(width, []string{""})) - baseForegroundStyle.GetVerticalFrameSize()
 	ui := lipgloss.NewStyle().
-		Height(contentHeight).
 		Width(width - baseForegroundStyle.GetHorizontalFrameSize()).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Left, firstSection, secondSection),
@@ -270,14 +276,19 @@ func processDetailSection(
 	return ui
 }
 
-func commandModal(text string) string {
+func formatSocketText(sock socket.Socket, lStyle styleFunc, eStyle styleFunc, cStyle styleFunc) string {
+	text := ""
+	switch sock.State {
+	case socket.StateListen:
+		text = lStyle(fmt.Sprintf("%s %s:%d (%s)", sock.Proto, sock.Addr, sock.Port, "LISTEN"))
+	case socket.StateEstablished:
+		text = eStyle(fmt.Sprintf("%s %s:%d (%s)", sock.Proto, sock.Addr, sock.Port, "ESTABLISHED"))
+	case socket.StateClose:
+		text = cStyle(fmt.Sprintf("%s %s:%d (%s)", sock.Proto, sock.Addr, sock.Port, "CLOSE"))
+	}
+	return text
+}
 
-	modalStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("57")).
-		PaddingLeft(1).
-		PaddingRight(1).
-		Align(lipgloss.Center, lipgloss.Center)
-
-	return modalStyle.Render(text)
+func scrollingInfo(scrollingPercent float64, visibleContentPercent float64) string {
+	return fmt.Sprintf("scrolling %3.f%% · showing %3.f%%", scrollingPercent, visibleContentPercent)
 }

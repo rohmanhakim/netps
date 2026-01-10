@@ -31,10 +31,11 @@ type Model struct {
 	cancel           context.CancelFunc
 	width, height    int
 	mode             string
-	modeColor        string
+	modeColor        common.ColorMode
+	theme            common.Theme
 }
 
-func New() Model {
+func New(theme common.Theme) Model {
 	idleHelpItems := []string{
 		"[↑↓] select",
 		"[m] mult.select",
@@ -50,6 +51,7 @@ func New() Model {
 		idleHelpItems: idleHelpItems,
 		ctx:           ctx,
 		cancel:        cancel,
+		theme:         theme,
 	}
 }
 
@@ -112,9 +114,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	if m.mode == "Process List" {
-		m.modeColor = "243"
+		m.modeColor = common.ColorModeNeutral
 	} else {
-		m.modeColor = "57"
+		m.modeColor = common.ColorModeSpecial
 	}
 
 	m.table, cmd = m.table.Update(msg)
@@ -126,7 +128,7 @@ func (m Model) View() tea.View {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
 	processCount := fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries))
-	statusBar := common.StatusBar(m.width, m.mode, m.modeColor, processCount)
+	statusBar := common.StatusBar(m.theme, m.width, m.mode, m.modeColor, processCount, "", common.ColorModeNeutral)
 	actionBar := common.ActionBar(m.width, m.idleHelpItems)
 	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n" + actionBar + "\n")
 	v.AltScreen = true
@@ -161,7 +163,7 @@ func (m *Model) updateTableSize(newWidth int, newHeight int) {
 	m.table.SetWidth(newTableWidth)
 	processCount := fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries))
 
-	statusBarHeight := lipgloss.Height(common.StatusBar(m.width, m.mode, m.modeColor, processCount))
+	statusBarHeight := lipgloss.Height(common.StatusBar(m.theme, m.width, m.mode, m.modeColor, processCount, "", common.ColorModeNeutral))
 	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
 	m.table.SetHeight(newHeight - VerticalPadding - statusBarHeight - actionBarHeight)
 

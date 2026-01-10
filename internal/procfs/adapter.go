@@ -121,7 +121,7 @@ func (s *Client) User(ctx context.Context, pid int) (process.ProcessUser, error)
 	return user, nil
 }
 
-func (s *Client) SocketsByStates(ctx context.Context, pid int, states []string) ([]socket.Socket, error) {
+func (s *Client) SocketsByStates(ctx context.Context, pid int, states []socket.SocketState) ([]socket.Socket, error) {
 	sockets, err := net.ParseSocketsByStates(pid, states)
 	if err != nil {
 		return []socket.Socket{}, err

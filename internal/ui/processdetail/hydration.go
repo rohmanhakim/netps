@@ -3,109 +3,112 @@ package processdetail
 import (
 	"context"
 	"netps/internal/process"
-	"netps/internal/procfs"
 	"netps/internal/socket"
-	"netps/internal/sysconf"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-func HydrateStaticIds(pid int) tea.Cmd {
+func HydrateStaticIds(ctx context.Context, pid int, processService *process.Service) tea.Cmd {
 	return func() tea.Msg {
-		procfsClient := procfs.NewClient()
-		sysconfClient := sysconf.NewClient()
-		cfg := process.Config{
-			Process:   procfsClient,
-			Detail:    procfsClient,
-			Clocktick: sysconfClient,
-			PageSize:  sysconfClient,
-			UpTime:    procfsClient,
-			Resource:  procfsClient,
-			User:      procfsClient,
+		if ctx.Err() != nil {
+			return staticIdHydratedMsg{Err: ctx.Err()} // Propagate error
 		}
-		processService := process.NewProcessService(cfg)
-		processDetail, err := processService.GetProcessDetail(context.Background(), pid)
-		if err != nil {
-			panic(err)
-		}
-		return detailHydratedMsg{
-			ExecPath:   processDetail.ExecPath,
-			Command:    processDetail.Command,
-			PPID:       processDetail.PPID,
-			ParentName: processDetail.ParentName,
 
-			Err: err,
+		processDetail, err := processService.GetProcessDetail(ctx, pid)
+
+		msg := staticIdHydratedMsg{}
+		if err == nil {
+			msg = staticIdHydratedMsg{
+				ExecPath:   processDetail.ExecPath,
+				Command:    processDetail.Command,
+				PPID:       processDetail.PPID,
+				ParentName: processDetail.ParentName,
+			}
+		} else {
+			msg.Err = err
 		}
+		return msg
 	}
 }
 
-func HydrateResource(pid int) tea.Cmd {
+func HydrateResource(ctx context.Context, pid int, processService *process.Service) tea.Cmd {
 	return func() tea.Msg {
-		procfsClient := procfs.NewClient()
-		sysconfClient := sysconf.NewClient()
-		cfg := process.Config{
-			Process:   procfsClient,
-			Detail:    procfsClient,
-			Clocktick: sysconfClient,
-			PageSize:  sysconfClient,
-			UpTime:    procfsClient,
-			Resource:  procfsClient,
-			User:      procfsClient,
+		if ctx.Err() != nil {
+			return resourceHydratedMsg{Err: ctx.Err()} // Propagate error
 		}
-		processService := process.NewProcessService(cfg)
-		processResource, err := processService.GetProcessResource(context.Background(), pid)
-		if err != nil {
-			panic(err)
+
+		processResource, err := processService.GetProcessResource(ctx, pid)
+
+		msg := resourceHydratedMsg{}
+		if err == nil {
+			msg = resourceHydratedMsg{
+				RSSByte:     processResource.ResidentSetSizeByte,
+				StartTime:   processResource.StartTimeSec,
+				ElapsedTime: processResource.ElapsedTimeSec,
+				VSZByte:     processResource.VirtualMemorySize,
+				UTime:       processResource.UserCPUTimeSecond,
+				STime:       processResource.SystemCPUTimeSecond,
+			}
+		} else {
+			msg.Err = err
 		}
-		return resourceHydratedMsg{
-			RSSByte:     processResource.ResidentSetSizeByte,
-			StartTime:   processResource.StartTimeSec,
-			ElapsedTime: processResource.ElapsedTimeSec,
-			VSZByte:     processResource.VirtualMemorySize,
-			UTime:       processResource.UserCPUTimeSecond,
-			STime:       processResource.SystemCPUTimeSecond,
-		}
+		return msg
 	}
 }
 
-func HydrateUser(pid int) tea.Cmd {
+func HydrateUser(ctx context.Context, pid int, processService *process.Service) tea.Cmd {
 	return func() tea.Msg {
-		procfsClient := procfs.NewClient()
-		sysconfClient := sysconf.NewClient()
-		cfg := process.Config{
-			Process:   procfsClient,
-			Detail:    procfsClient,
-			Clocktick: sysconfClient,
-			PageSize:  sysconfClient,
-			UpTime:    procfsClient,
-			Resource:  procfsClient,
-			User:      procfsClient,
+		if ctx.Err() != nil {
+			return userHydratedMsg{Err: ctx.Err()} // Propagate error
 		}
-		processService := process.NewProcessService(cfg)
 
-		processUser, err := processService.GetUser(context.Background(), pid)
-		if err != nil {
-			panic(err)
+		processUser, err := processService.GetUser(ctx, pid)
+
+		msg := userHydratedMsg{}
+		if err == nil {
+			msg = userHydratedMsg{
+				UserUID:        processUser.RealUID,
+				UserName:       processUser.Name,
+				UserPrivileged: processUser.PrivilegedString(),
+				Err:            err,
+			}
+		} else {
+			msg.Err = err
 		}
-		return userHydratedMsg{
-			UserUID:        processUser.RealUID,
-			UserName:       processUser.Name,
-			UserPrivileged: processUser.PrivilegedString(),
-		}
+		return msg
 	}
 }
 
-func HydrateSockets(pid int) tea.Cmd {
+func HydrateSockets(ctx context.Context, pid int, socketService *socket.Service) tea.Cmd {
 	return func() tea.Msg {
-		procfsClient := procfs.NewClient()
-		socketService := socket.NewService(procfsClient)
-		socketStates := []string{"LISTEN", "ESTABLISHED", "CLOSE"}
-		sockets, err := socketService.GetSocketsByStates(context.Background(), pid, socketStates)
-		if err != nil {
-			panic(err)
+		if ctx.Err() != nil {
+			return socketsHydratedMsg{Err: ctx.Err()} // Propagate error
 		}
-		return socketHydrateMsg{
-			Sockets: sockets,
+
+		socketStates := []socket.SocketState{socket.StateListen, socket.StateEstablished, socket.StateClose}
+		sockets, err := socketService.GetSocketsByStates(ctx, pid, socketStates)
+
+		msg := socketsHydratedMsg{}
+
+		if err == nil {
+			msg = socketsHydratedMsg{
+				Sockets: sockets,
+				Err:     err,
+			}
+		} else {
+			msg.Err = err
+		}
+		return msg
+	}
+}
+
+func Initialize(pid int, name string, w, h int) tea.Cmd {
+	return func() tea.Msg {
+		return initMsg{
+			pid:    pid,
+			name:   name,
+			width:  w,
+			height: h,
 		}
 	}
 }

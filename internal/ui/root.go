@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"netps/internal/ui/common"
 	"netps/internal/ui/message"
 	"netps/internal/ui/processdetail"
 	"netps/internal/ui/processlist"
@@ -16,6 +17,7 @@ const (
 )
 
 type Root struct {
+	theme         common.Theme
 	screen        Screen
 	width, height int
 	processList   processlist.Model
@@ -23,10 +25,28 @@ type Root struct {
 }
 
 func New() Root {
+	theme := common.Theme{
+		ColorForegroundBase:      common.ColorWhite,
+		ColorForegroundSubtle:    common.ColorDarkGray,
+		ColorBackgroundSecondary: common.ColorDarkOlive,
+		ColorForegroundSecondary: common.ColorArgent,
+		ColorAccent:              common.ColorElectricIndigo,
+		ColorHighlight:           common.ColorElectricIndigo,
+		ColorHighlightSubtle:     common.ColorBoulder,
+		ColorInactive:            common.ColorDarkCharcoal,
+		ColorSuccess:             common.ColorOfficeGreen,
+		ColorNeutral:             common.ColorBlueJeans,
+		ColorDanger:              common.ColorBrightRed,
+		ColorWarning:             common.ColorGoldenRod,
+
+		SpacingSmall:  1,
+		SpacingMedium: 2,
+	}
 	return Root{
+		theme:         theme,
 		screen:        ScreenProcessList,
-		processList:   processlist.New(),
-		processDetail: processdetail.Model{},
+		processList:   processlist.New(theme),
+		processDetail: processdetail.New(theme),
 	}
 }
 
@@ -42,15 +62,8 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case message.GoToProcessDetail:
-		m.processDetail = processdetail.New(msg.PID, msg.Name)
 		m.screen = ScreenProcessDetail
-		return m, tea.Batch(
-			processdetail.Initialize(m.width, m.height),
-			processdetail.HydrateStaticIds(msg.PID),
-			processdetail.HydrateResource(msg.PID),
-			processdetail.HydrateUser(msg.PID),
-			processdetail.HydrateSockets(msg.PID),
-		)
+		return m, m.processDetail.Init(msg.PID, msg.Name, m.width, m.height)
 	case message.GoBack:
 		m.screen = ScreenProcessList
 		return m, m.processList.Init(m.width, m.height)

@@ -1,4 +1,4 @@
-package processdetail
+package sendsignal
 
 import "charm.land/lipgloss/v2"
 
