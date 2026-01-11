@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"log"
 	"netps/internal/ui/common"
+	"netps/internal/ui/common/command"
 	"netps/internal/ui/message"
 	"netps/internal/ui/processdetail"
 	"netps/internal/ui/processlist"
@@ -17,14 +19,15 @@ const (
 )
 
 type Root struct {
-	theme         common.Theme
-	screen        Screen
-	width, height int
-	processList   processlist.Model
-	processDetail processdetail.Model
+	theme          common.Theme
+	commandManager command.Manager
+	screen         Screen
+	width, height  int
+	processList    processlist.Model
+	processDetail  processdetail.Model
 }
 
-func New() Root {
+func New() (Root, error) {
 	theme := common.Theme{
 		ColorForegroundBase:      common.ColorWhite,
 		ColorForegroundSubtle:    common.ColorDarkGray,
@@ -42,12 +45,38 @@ func New() Root {
 		SpacingSmall:  1,
 		SpacingMedium: 2,
 	}
-	return Root{
-		theme:         theme,
-		screen:        ScreenProcessList,
-		processList:   processlist.New(theme),
-		processDetail: processdetail.New(theme),
+
+	manager := command.NewManager()
+	err := manager.RegisterGlobalCommand(command.KeyQ, command.CommandQuit)
+	if err != nil {
+		return Root{}, err
 	}
+	err = manager.RegisterGlobalCommand(command.KeyCtrlC, command.CommandQuit)
+	if err != nil {
+		return Root{}, err
+	}
+	err = manager.RegisterGlobalCommand(command.KeyEsc, command.CommandBack)
+	if err != nil {
+		return Root{}, err
+	}
+
+	processlist, err := processlist.New(theme, &manager)
+	if err != nil {
+		log.Fatalf("Root error at New creating processlist: %v", err)
+	}
+
+	processdetail, err := processdetail.New(theme, &manager)
+	if err != nil {
+		log.Fatalf("Root error at New creating processdetail: %v", err)
+	}
+
+	return Root{
+		theme:          theme,
+		commandManager: manager,
+		screen:         ScreenProcessList,
+		processList:    processlist,
+		processDetail:  processdetail,
+	}, nil
 }
 
 func (m Root) Init() tea.Cmd {

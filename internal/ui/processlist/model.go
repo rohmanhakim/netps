@@ -11,9 +11,12 @@ import (
 	"fmt"
 	"netps/internal/process"
 	"netps/internal/ui/common"
+	"netps/internal/ui/common/command"
 	"netps/internal/ui/message"
 
 	"strconv"
+
+	"log"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
@@ -26,33 +29,57 @@ const VerticalPadding = 2
 type Model struct {
 	processSummaries []process.ProcessSummary
 	table            table.Model
-	idleHelpItems    []string
 	ctx              context.Context
 	cancel           context.CancelFunc
 	width, height    int
 	mode             string
 	modeColor        common.ColorMode
 	theme            common.Theme
+	commandManager   *command.Manager
 }
 
-func New(theme common.Theme) Model {
-	idleHelpItems := []string{
-		"[↑↓] select",
-		"[m] mult.select",
-		"[i] inspect",
-		"[s] send signal",
-		"[f] filter",
-		"[o] order",
-		"[q] quit",
-	}
+func New(theme common.Theme, commandManager *command.Manager) (Model, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	return Model{
-		mode:          "Process List",
-		idleHelpItems: idleHelpItems,
-		ctx:           ctx,
-		cancel:        cancel,
-		theme:         theme,
+
+	err := commandManager.SetContext(command.ContextProcessListScreen)
+	if err != nil {
+		cancel()
+		return Model{}, err
 	}
+
+	err = registerContextualCommands(commandManager)
+	if err != nil {
+		cancel()
+		return Model{}, err
+	}
+
+	return Model{
+		mode:           "Process List",
+		ctx:            ctx,
+		cancel:         cancel,
+		theme:          theme,
+		commandManager: commandManager,
+	}, nil
+}
+
+func registerContextualCommands(commandManager *command.Manager) error {
+	err := commandManager.RegisterContextCommand(command.ContextProcessListScreen, command.KeyUp, command.CommandMove)
+	if err != nil {
+		return err
+	}
+	err = commandManager.RegisterContextCommand(command.ContextProcessListScreen, command.KeyDown, command.CommandMove)
+	if err != nil {
+		return err
+	}
+	err = commandManager.RegisterContextCommand(command.ContextProcessListScreen, command.KeyEnter, command.CommandInspect)
+	if err != nil {
+		return err
+	}
+	err = commandManager.RegisterContextCommand(command.ContextProcessListScreen, command.KeyS, command.CommandSendSignal)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m Model) Init(w, h int) tea.Cmd {
@@ -83,17 +110,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.cancel()
 		return m, tea.Quit // might later add an error view. No action needed now.
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "esc":
-			if m.table.Focused() {
-				m.table.Blur()
-			} else {
-				m.table.Focus()
-			}
-		case "q", "ctrl+c":
+		c := m.commandManager.GetCommand(command.ToKeyPress(msg.String()))
+
+		switch c {
+		case command.CommandQuit:
 			m.cancel()
 			return m, tea.Quit
-		case "enter":
+		case command.CommandInspect:
 			row := m.table.SelectedRow()
 			if len(row) == 0 {
 				return m, nil
@@ -113,6 +136,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
+	err := m.setCurrentCommandContext()
+	if err != nil {
+		log.Fatalf("Process Detail Model Error: %v", err)
+	}
+
 	if m.mode == "Process List" {
 		m.modeColor = common.ColorModeNeutral
 	} else {
@@ -129,7 +157,7 @@ func (m Model) View() tea.View {
 		BorderForeground(lipgloss.Color("240"))
 	processCount := fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries))
 	statusBar := common.StatusBar(m.theme, m.width, m.mode, m.modeColor, processCount, "", common.ColorModeNeutral)
-	actionBar := common.ActionBar(m.width, m.idleHelpItems)
+	actionBar := common.ActionBar(m.width, m.commandManager.GenerateContextHelp())
 	v := tea.NewView(baseStyle.Render(m.table.View()) + "\n" + statusBar + "\n" + actionBar + "\n")
 	v.AltScreen = true
 	return v
@@ -164,7 +192,7 @@ func (m *Model) updateTableSize(newWidth int, newHeight int) {
 	processCount := fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries))
 
 	statusBarHeight := lipgloss.Height(common.StatusBar(m.theme, m.width, m.mode, m.modeColor, processCount, "", common.ColorModeNeutral))
-	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.idleHelpItems))
+	actionBarHeight := lipgloss.Height(common.ActionBar(m.width, m.commandManager.GenerateContextHelp()))
 	m.table.SetHeight(newHeight - VerticalPadding - statusBarHeight - actionBarHeight)
 
 	maxFieldLenghts := maxFieldLengths(m.processSummaries)
@@ -239,4 +267,9 @@ func (m Model) getShowingProcessCount() int {
 
 	showingProcessCount := min(processCount, tableHeight)
 	return showingProcessCount
+}
+
+func (m *Model) setCurrentCommandContext() error {
+	err := m.commandManager.SetContext(command.ContextProcessListScreen)
+	return err
 }

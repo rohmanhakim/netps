@@ -11,7 +11,11 @@ import (
 
 func main() {
 
-	root := ui.New()
+	root, err := ui.New()
+	if err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
 
 	p := tea.NewProgram(root)
 	if _, err := p.Run(); err != nil {
