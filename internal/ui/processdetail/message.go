@@ -14,16 +14,6 @@ const (
 	StateError
 )
 
-// Messages that represent side effects (block these on cancellation)
-type sideEffectMsg interface {
-	isSideEffect()
-}
-
-// Messages that represent UI state changes (always allow these)
-type uiStateMsg interface {
-	isUIState()
-}
-
 type StaticIdHydrationData struct {
 	ExecPath   string
 	Command    string
@@ -95,10 +85,6 @@ type initMsg struct {
 	width, height int
 }
 
-type sendSignalMsg struct{}
-
-type closeSendSignalModalMsg struct{}
-
 type dismissnotificationMsg struct{}
 
 type retryMsg struct{}
@@ -109,6 +95,4 @@ func (resourceHydratedMsg) isSideEffect() {}
 func (userHydratedMsg) isSideEffect()     {}
 func (socketsHydratedMsg) isSideEffect()  {}
 
-func (sendSignalMsg) isUIState()           {}
-func (closeSendSignalModalMsg) isUIState() {}
-func (dismissnotificationMsg) isUIState()  {}
+func (dismissnotificationMsg) isUIState() {}

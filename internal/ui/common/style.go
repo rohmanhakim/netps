@@ -14,18 +14,18 @@ const ColorArgent = "7"
 const ColorOfficeGreen = "2"
 
 type Theme struct {
-	ColorForegroundBase      string
-	ColorForegroundSecondary string
-	ColorBackgroundSecondary string
-	ColorForegroundSubtle    string
-	ColorInactive            string
-	ColorAccent              string
-	ColorHighlight           string
-	ColorHighlightSubtle     string
-	ColorSuccess             string
-	ColorNeutral             string
-	ColorDanger              string
-	ColorWarning             string
-	SpacingSmall             int
-	SpacingMedium            int
+	ColorForegroundBase       string
+	ColorForegroundSecondary  string
+	ColorForegroundDecoration string
+	ColorForegroundSubtle     string
+	ColorInactive             string
+	ColorAccent               string
+	ColorHighlight            string
+	ColorHighlightSubtle      string
+	ColorSuccess              string
+	ColorNeutral              string
+	ColorDanger               string
+	ColorWarning              string
+	SpacingSmall              int
+	SpacingMedium             int
 }

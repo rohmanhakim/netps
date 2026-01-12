@@ -51,6 +51,7 @@ import (
 	"netps/internal/sysconf"
 	"netps/internal/ui/common"
 	"netps/internal/ui/common/command"
+	"netps/internal/ui/common/lifecycle"
 	"netps/internal/ui/common/sendsignal"
 	"netps/internal/ui/message"
 
@@ -62,7 +63,6 @@ import (
 )
 
 type ScreenState int
-type Mode int
 
 /*
  * Screen States
@@ -83,11 +83,6 @@ const (
 	StateRetryHydrations
 )
 
-const (
-	ModeIdle Mode = iota
-	ModeSendSignal
-)
-
 type Model struct {
 	PID         int
 	ProcessName string
@@ -97,22 +92,21 @@ type Model struct {
 	userHydration     UserHydrationData
 	socketsHydration  SocketsHydrationData
 
-	windowWidth   int
-	windowHeight  int
 	viewportModel viewport.Model
-
-	operationMode Mode
 
 	sendSignalModalModel sendsignal.Model
 
-	appTheme       common.Theme
-	ctx            context.Context
-	cancel         context.CancelFunc
 	processService *process.Service
 	socketService  *socket.Service
 
-	errorsToRetry  tea.Cmd
-	commandManager *command.Manager
+	errorsToRetry tea.Cmd
+
+	ctx                       context.Context
+	cancel                    context.CancelFunc
+	operationMode             lifecycle.Mode
+	appTheme                  common.Theme
+	commandManager            *command.Manager
+	windowWidth, windowHeight int
 }
 
 type styleFunc func(string) string
@@ -120,6 +114,19 @@ type styleFunc func(string) string
 func New(theme common.Theme, commandManager *command.Manager) (Model, error) {
 	sendSignal := sendsignal.New()
 	ctx, cancel := context.WithCancel(context.Background())
+
+	err := commandManager.SetContext(command.ContextProcessListScreen)
+	if err != nil {
+		cancel()
+		return Model{}, err
+	}
+
+	err = registerContextualCommands(commandManager)
+	if err != nil {
+		cancel()
+		return Model{}, err
+	}
+
 	procfsClient := procfs.NewClient()
 	sysconfClient := sysconf.NewClient()
 	cfg := process.Config{
@@ -134,31 +141,20 @@ func New(theme common.Theme, commandManager *command.Manager) (Model, error) {
 	processService := process.NewProcessService(cfg)
 	socketService := socket.NewService(procfsClient)
 
-	err := commandManager.SetContext(command.ContextProcessListScreen)
-	if err != nil {
-		cancel()
-		return Model{}, err
-	}
-
-	err = registerContextualCommands(commandManager)
-	if err != nil {
-		cancel()
-		return Model{}, err
-	}
-
 	return Model{
-		sendSignalModalModel: sendSignal,
-		appTheme:             theme,
 		staticIdHydration:    StaticIdHydrationData{},
 		resourceHydration:    ResourceHydrationData{},
 		userHydration:        UserHydrationData{},
 		socketsHydration:     SocketsHydrationData{},
-		ctx:                  ctx,
-		cancel:               cancel,
-		commandManager:       commandManager,
 		processService:       processService,
 		socketService:        socketService,
-	}, err
+		ctx:                  ctx,
+		cancel:               cancel,
+		appTheme:             theme,
+		operationMode:        lifecycle.ModeIdle,
+		commandManager:       commandManager,
+		sendSignalModalModel: sendSignal,
+	}, nil
 }
 
 func (m Model) Init(pid int, name string, width, height int) tea.Cmd {
@@ -174,8 +170,8 @@ func (m Model) Init(pid int, name string, width, height int) tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	if _, isSideEffect := msg.(sideEffectMsg); isSideEffect {
-		if m.shouldCancelSideEffects() {
+	if _, isSideEffect := msg.(lifecycle.SideEffectMsg); isSideEffect {
+		if lifecycle.ShouldCancelSideEffects(m.ctx) {
 			return m, nil
 		}
 	}
@@ -196,14 +192,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.resetAllData()
 		m.PID = msg.pid
 		m.ProcessName = msg.name
-		m.operationMode = ModeIdle
+		m.operationMode = lifecycle.ModeIdle
 		m.windowWidth = msg.width
 		m.windowHeight = msg.height
 		m.sendSignalModalModel.Initialize()
 		m.setAllHydrationState(StateHydrating)
 	case retryMsg:
-		if m.operationMode == ModeSendSignal {
-			m.operationMode = ModeIdle
+		if m.operationMode == lifecycle.ModeSendSignal {
+			m.operationMode = lifecycle.ModeIdle
 		}
 		m.resetContext()
 		commands := m.collectRetryCommands()
@@ -269,11 +265,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.socketsHydration.err = msg.Err
 			dataChanged = true
 		}
-	case sendSignalMsg:
-		m.operationMode = ModeSendSignal
+	case lifecycle.SendSignalMsg:
+		m.operationMode = lifecycle.ModeSendSignal
 		viewportContentColorChanged = true // opening send signal modal changed the viewport's content color to dim which required to rerender the viewport
-	case closeSendSignalModalMsg:
-		m.operationMode = ModeIdle
+	case lifecycle.CloseSendSignalModalMsg:
+		m.operationMode = lifecycle.ModeIdle
 		viewportContentColorChanged = true // closing send signal modal changed the viewport's content color to normal which required to rerender the viewport
 	case dismissnotificationMsg:
 		// Dismissing errors hides the panel but does not change data completeness.
@@ -283,9 +279,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.resetAllErrors()
 	case tea.KeyMsg:
 		c := m.commandManager.GetCommand(command.ToKeyPress(msg.String()))
-
 		switch c {
 		case command.CommandBack:
+			return m.handleEsc()
+		case command.CommandClose:
 			return m.handleEsc()
 		case command.CommandSendSignal:
 			return m.handleS()
@@ -311,7 +308,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		log.Fatalf("Process Detail Screen error at update: %v", err)
 	}
 
-	if m.operationMode == ModeSendSignal {
+	if m.operationMode == lifecycle.ModeSendSignal {
 		m.sendSignalModalModel, cmd = m.sendSignalModalModel.Update(msg)
 		return m, cmd
 	} else {
@@ -336,7 +333,7 @@ func (m Model) View() tea.View {
 		layers := []*lipgloss.Layer{}
 		helpItems := m.commandManager.GenerateContextHelp()
 
-		if m.operationMode == ModeSendSignal {
+		if m.operationMode == lifecycle.ModeSendSignal {
 			signalList := m.sendSignalModalModel
 			signalListWidth := lipgloss.Width(signalList.Modal)
 			signalListHeight := lipgloss.Height(signalList.Modal)
@@ -423,9 +420,9 @@ func (m *Model) adjustViewportSize() {
 	statusBar := common.StatusBar(m.appTheme, m.windowWidth, m.modeName(), m.modeColor(), scrollingInfo(m.getScrollingPercent(), m.getVisibleContentPercent()), "", common.ColorModeNeutral)
 	var actionBar string
 	switch m.operationMode {
-	case ModeIdle:
+	case lifecycle.ModeIdle:
 		actionBar = common.ActionBar(m.windowWidth, m.commandManager.GenerateContextHelp())
-	case ModeSendSignal:
+	case lifecycle.ModeSendSignal:
 		actionBar = common.ActionBar(m.windowWidth, m.sendSignalModalModel.SendSignalHelpItems)
 	default:
 		actionBar = ""
@@ -476,14 +473,14 @@ func (m *Model) getScrollingPercent() float64 {
 }
 
 func (m *Model) modeName() string {
-	if m.operationMode == ModeSendSignal {
+	if m.operationMode == lifecycle.ModeSendSignal {
 		return "Send Signal"
 	}
 	return "Process Detail"
 }
 
 func (m *Model) modeColor() common.ColorMode {
-	if m.operationMode == ModeSendSignal {
+	if m.operationMode == lifecycle.ModeSendSignal {
 		return common.ColorModeSpecial
 	} else {
 		return common.ColorModeNeutral
@@ -518,7 +515,7 @@ func (m *Model) resetAllHydrationStatus() {
 
 func (m *Model) renderContent() string {
 	ui := processDetailSection(
-		m.operationMode == ModeIdle,
+		m.operationMode == lifecycle.ModeIdle,
 		m.appTheme,
 		m.windowWidth,
 		m.ProcessName,
@@ -544,9 +541,9 @@ func (m *Model) renderContent() string {
 
 func (m Model) handleEsc() (Model, tea.Cmd) {
 	screenState := m.computeScreenState()
-	if m.operationMode == ModeSendSignal {
+	if m.operationMode == lifecycle.ModeSendSignal {
 		return m, func() tea.Msg {
-			return closeSendSignalModalMsg{}
+			return lifecycle.CloseSendSignalModalMsg{}
 		}
 	} else {
 		if screenState == StateHydrationsInProgress || screenState == StateInit || screenState == StateOneHydrationFinished {
@@ -562,9 +559,9 @@ func (m Model) handleEsc() (Model, tea.Cmd) {
 
 func (m Model) handleQ() (Model, tea.Cmd) {
 	screenState := m.computeScreenState()
-	if m.operationMode == ModeSendSignal {
+	if m.operationMode == lifecycle.ModeSendSignal {
 		return m, func() tea.Msg {
-			return closeSendSignalModalMsg{}
+			return lifecycle.CloseSendSignalModalMsg{}
 		}
 	} else {
 		if screenState == StateHydrationsInProgress || screenState == StateInit || screenState == StateOneHydrationFinished {
@@ -578,9 +575,9 @@ func (m Model) handleS() (Model, tea.Cmd) {
 
 	// User can send signal as long as the PID is retrived
 	// which is already have passed by process list screen (not from hydrating)
-	if m.operationMode == ModeIdle && m.computeScreenState() != StateInit {
+	if m.operationMode == lifecycle.ModeIdle && m.computeScreenState() != StateInit {
 		return m, func() tea.Msg {
-			return sendSignalMsg{}
+			return lifecycle.SendSignalMsg{}
 		}
 	} else {
 		return m, func() tea.Msg {
@@ -592,7 +589,7 @@ func (m Model) handleS() (Model, tea.Cmd) {
 func (m Model) handleNotificationDismissKey() (Model, tea.Cmd) {
 	switch m.computeScreenState() {
 	case StateHydrationsFinishedErrorsExist:
-		if m.operationMode == ModeSendSignal {
+		if m.operationMode == lifecycle.ModeSendSignal {
 			return m, func() tea.Msg {
 				return nil // do nothing for now; next will implement proper signal sending logic
 			}
@@ -611,7 +608,7 @@ func (m Model) handleNotificationDismissKey() (Model, tea.Cmd) {
 func (m Model) handleErrorRetryKey() (Model, tea.Cmd) {
 	switch m.computeScreenState() {
 	case StateHydrationsFinishedErrorsExist:
-		if m.operationMode == ModeSendSignal {
+		if m.operationMode == lifecycle.ModeSendSignal {
 			return m, func() tea.Msg {
 				return nil // when mode is send signal, user should not have access to retry error
 			}
@@ -794,11 +791,6 @@ func (m *Model) allHydrating() bool {
 		m.socketsHydration.state == StateHydrating
 }
 
-// helper to check if we should cancel *side effects*
-func (m *Model) shouldCancelSideEffects() bool {
-	return m.ctx.Err() != nil
-}
-
 func registerContextualCommands(commandManager *command.Manager) error {
 	err := commandManager.RegisterContextCommand(command.ContextProcessDetailScreen, command.KeyUp, command.CommandScroll)
 	if err != nil {
@@ -809,6 +801,10 @@ func registerContextualCommands(commandManager *command.Manager) error {
 		return err
 	}
 	err = commandManager.RegisterContextCommand(command.ContextProcessDetailScreen, command.KeyS, command.CommandSendSignal)
+	if err != nil {
+		return err
+	}
+	err = commandManager.RegisterContextCommand(command.ContextProcessDetailScreen, command.KeyEsc, command.CommandBack)
 	if err != nil {
 		return err
 	}
@@ -846,12 +842,16 @@ func registerContextualCommands(commandManager *command.Manager) error {
 	if err != nil {
 		return err
 	}
+	err = commandManager.RegisterContextCommand(command.ContextSendSignal, command.KeyEsc, command.CommandClose)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (m *Model) setCurrentCommandContext() error {
 	var err error
-	if m.operationMode == ModeSendSignal {
+	if m.operationMode == lifecycle.ModeSendSignal {
 		err = m.commandManager.SetContext(command.ContextSendSignal)
 	} else {
 		switch m.computeScreenState() {

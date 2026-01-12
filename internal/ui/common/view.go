@@ -87,7 +87,7 @@ func StatusBar(
 ) string {
 	additionalInfoStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(theme.ColorForegroundSecondary)).
-		Background(lipgloss.Color(theme.ColorBackgroundSecondary)).
+		Background(lipgloss.Color(theme.ColorForegroundDecoration)).
 		PaddingRight(theme.SpacingSmall)
 
 	modeStyle := lipgloss.NewStyle().
@@ -125,7 +125,7 @@ func StatusBar(
 		Render(additionalInfo)
 	rightInfoText := rightInfoStyle.Render(rightInfo)
 	spacerStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color(theme.ColorBackgroundSecondary))
+		Background(lipgloss.Color(theme.ColorForegroundDecoration))
 
 	rightInfoWidth := 0
 	if strings.TrimSpace(rightInfo) != "" {

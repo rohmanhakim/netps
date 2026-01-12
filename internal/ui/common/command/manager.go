@@ -24,6 +24,7 @@ const (
 	CommandScroll         Command = "Scroll"
 	CommandSelect         Command = "Select"
 	CommandSendSignal     Command = "Send Signal"
+	CommandClose          Command = "Close"
 	CommandUnknown        Command = "Unknown"
 )
 
@@ -161,6 +162,10 @@ func NewManager() Manager {
 			CommandBack: {
 				KeyPresses:  []KeyPress{KeyEsc},
 				Description: "Go back",
+			},
+			CommandClose: {
+				KeyPresses:  []KeyPress{KeyEsc},
+				Description: "Close",
 			},
 			CommandRetry: {
 				KeyPresses:  []KeyPress{KeyR},

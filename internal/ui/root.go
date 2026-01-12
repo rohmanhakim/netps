@@ -29,18 +29,18 @@ type Root struct {
 
 func New() (Root, error) {
 	theme := common.Theme{
-		ColorForegroundBase:      common.ColorWhite,
-		ColorForegroundSubtle:    common.ColorDarkGray,
-		ColorBackgroundSecondary: common.ColorDarkOlive,
-		ColorForegroundSecondary: common.ColorArgent,
-		ColorAccent:              common.ColorElectricIndigo,
-		ColorHighlight:           common.ColorElectricIndigo,
-		ColorHighlightSubtle:     common.ColorBoulder,
-		ColorInactive:            common.ColorDarkCharcoal,
-		ColorSuccess:             common.ColorOfficeGreen,
-		ColorNeutral:             common.ColorBlueJeans,
-		ColorDanger:              common.ColorBrightRed,
-		ColorWarning:             common.ColorGoldenRod,
+		ColorForegroundBase:       common.ColorWhite,
+		ColorForegroundSubtle:     common.ColorDarkGray,
+		ColorForegroundDecoration: common.ColorDarkOlive,
+		ColorForegroundSecondary:  common.ColorArgent,
+		ColorAccent:               common.ColorElectricIndigo,
+		ColorHighlight:            common.ColorElectricIndigo,
+		ColorHighlightSubtle:      common.ColorBoulder,
+		ColorInactive:             common.ColorDarkCharcoal,
+		ColorSuccess:              common.ColorOfficeGreen,
+		ColorNeutral:              common.ColorBlueJeans,
+		ColorDanger:               common.ColorBrightRed,
+		ColorWarning:              common.ColorGoldenRod,
 
 		SpacingSmall:  1,
 		SpacingMedium: 2,
@@ -52,10 +52,6 @@ func New() (Root, error) {
 		return Root{}, err
 	}
 	err = manager.RegisterGlobalCommand(command.KeyCtrlC, command.CommandQuit)
-	if err != nil {
-		return Root{}, err
-	}
-	err = manager.RegisterGlobalCommand(command.KeyEsc, command.CommandBack)
 	if err != nil {
 		return Root{}, err
 	}
