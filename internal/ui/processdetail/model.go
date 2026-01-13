@@ -286,17 +286,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		c := m.commandManager.GetCommand(command.ToKeyPress(msg.String()))
 		switch c {
 		case command.CommandBack:
-			return m.handleEsc()
+			return m.handleBack()
 		case command.CommandClose:
-			return m.handleEsc()
+			return m.handleCloseSendSignal()
 		case command.CommandSendSignal:
-			return m.handleS()
+			return m.handleOpenSendSignal()
 		case command.CommandQuit:
-			return m.handleQ()
+			return m.handleQuit()
 		case command.CommandRetry:
-			return m.handleErrorRetryKey()
+			return m.handleErrorRetry()
 		case command.CommandDismiss:
-			return m.handleNotificationDismissKey()
+			return m.handleNotificationDismiss()
 		}
 	}
 
@@ -541,25 +541,25 @@ func (m *Model) renderContent() string {
 	return trimmed
 }
 
-func (m Model) handleEsc() (Model, tea.Cmd) {
+func (m Model) handleBack() (Model, tea.Cmd) {
 	screenState := m.computeScreenState()
-	if m.operationMode == lifecycle.ModeSendSignal {
-		return m, func() tea.Msg {
-			return lifecycle.CloseSendSignalModalMsg{}
-		}
-	} else {
-		if screenState == StateHydrationsInProgress || screenState == StateInit || screenState == StateOneHydrationFinished {
-			m.cancel()
+	if screenState == StateHydrationsInProgress || screenState == StateInit || screenState == StateOneHydrationFinished {
+		m.cancel()
 
-		}
-		return m, func() tea.Msg {
-			m.resetAllData()
-			return message.GoBack{}
-		}
+	}
+	return m, func() tea.Msg {
+		m.resetAllData()
+		return message.GoBack{}
 	}
 }
 
-func (m Model) handleQ() (Model, tea.Cmd) {
+func (m Model) handleCloseSendSignal() (Model, tea.Cmd) {
+	return m, func() tea.Msg {
+		return lifecycle.CloseSendSignalModalMsg{}
+	}
+}
+
+func (m Model) handleQuit() (Model, tea.Cmd) {
 	screenState := m.computeScreenState()
 	if m.operationMode == lifecycle.ModeSendSignal {
 		return m, func() tea.Msg {
@@ -573,7 +573,7 @@ func (m Model) handleQ() (Model, tea.Cmd) {
 	}
 }
 
-func (m Model) handleS() (Model, tea.Cmd) {
+func (m Model) handleOpenSendSignal() (Model, tea.Cmd) {
 
 	// User can send signal as long as the PID is retrived
 	// which is already have passed by process list screen (not from hydrating)
@@ -591,7 +591,7 @@ func (m Model) handleS() (Model, tea.Cmd) {
 	}
 }
 
-func (m Model) handleNotificationDismissKey() (Model, tea.Cmd) {
+func (m Model) handleNotificationDismiss() (Model, tea.Cmd) {
 	switch m.computeScreenState() {
 	case StateHydrationsFinishedErrorsExist:
 		if m.operationMode == lifecycle.ModeSendSignal {
@@ -610,7 +610,7 @@ func (m Model) handleNotificationDismissKey() (Model, tea.Cmd) {
 	}
 }
 
-func (m Model) handleErrorRetryKey() (Model, tea.Cmd) {
+func (m Model) handleErrorRetry() (Model, tea.Cmd) {
 	switch m.computeScreenState() {
 	case StateHydrationsFinishedErrorsExist:
 		if m.operationMode == lifecycle.ModeSendSignal {
