@@ -44,7 +44,7 @@ type Model struct {
 }
 
 func New(theme common.Theme, commandManager *command.Manager) (Model, error) {
-	sendSignal := sendsignal.New()
+	sendSignal := sendsignal.New(theme)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	err := commandManager.SetContext(command.ContextProcessListScreen)
@@ -108,7 +108,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, tea.Quit // might later add an error view. No action needed now.
 	case lifecycle.SendSignalMsg:
 		m.operationMode = lifecycle.ModeSendSignal
+		m.sendSignalModalModel.SetProcessInfo(msg.ProcessPID, msg.ProcessName)
 		m.updateTableStyle()
+		err := m.setCurrentCommandContext()
+		if err != nil {
+			log.Fatalf("[lifecycle.SendSignalMsg] Process Detail Model Error: %v", err)
+		}
 	case lifecycle.CloseSendSignalModalMsg:
 		m.operationMode = lifecycle.ModeIdle
 		m.updateTableStyle()
@@ -122,13 +127,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case command.CommandInspect:
 			return m.handleInspect()
 		case command.CommandSendSignal:
-			return m.handleSendSignalOpen()
+			pid, err := m.getSelectedProcessPID()
+			if err != nil {
+				log.Fatalf("command.CommandSendSignal error: %s", err.Error())
+			}
+			name := m.getSelectedProcessName()
+			return m.handleSendSignalOpen(pid, name)
 		}
 	}
 
 	err := m.setCurrentCommandContext()
 	if err != nil {
-		log.Fatalf("Process Detail Model Error: %v", err)
+		log.Fatalf("[setCurrentCommandContext] Process Detail Model Error: %v", err)
 	}
 
 	if m.operationMode == lifecycle.ModeSendSignal {
@@ -136,9 +146,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, cmd
 	} else {
 		m.tableModel, cmd = m.tableModel.Update(msg)
-		return m, cmd
 	}
-
+	return m, cmd
 }
 
 func (m Model) View() tea.View {
@@ -162,11 +171,9 @@ func (m Model) View() tea.View {
 
 	if m.operationMode == lifecycle.ModeSendSignal {
 		signalList := m.sendSignalModalModel
-		signalListWidth := lipgloss.Width(signalList.Modal)
-		signalListHeight := lipgloss.Height(signalList.Modal)
 		modalLayer := lipgloss.NewLayer(signalList.View().Content).
-			X((m.windowWidth / 2) - (signalListWidth / 2)).
-			Y((m.windowHeight / 2) - (signalListHeight / 2)).
+			X((m.windowWidth / 2) - (signalList.ModalWidth() / 2)).
+			Y((m.windowHeight / 2) - (signalList.ModalHeight() / 2)).
 			Z(1)
 		layers = append(layers, modalLayer)
 	}
@@ -359,21 +366,36 @@ func (m Model) handleQuit() (Model, tea.Cmd) {
 	}
 }
 
-func (m Model) handleInspect() (Model, tea.Cmd) {
+func (m *Model) getSelectedProcessPID() (int, error) {
 	row := m.tableModel.SelectedRow()
 	if len(row) == 0 {
-		return m, nil
+		return -1, nil
 	}
 	pid, err := strconv.Atoi(row[0])
 	if err != nil {
-		return m, func() tea.Msg {
-			return hydrationErrorMsg{Error: err}
-		}
+		return -1, err
 	}
+	return pid, nil
+}
+
+func (m *Model) getSelectedProcessName() string {
+	row := m.tableModel.SelectedRow()
+	if len(row) == 0 {
+		return ""
+	}
+	return row[1]
+}
+
+func (m Model) handleInspect() (Model, tea.Cmd) {
+	pid, err := m.getSelectedProcessPID()
+	if err != nil {
+		log.Fatalf("handleInspect() get error: %s", err.Error())
+	}
+	name := m.getSelectedProcessName()
 	return m, func() tea.Msg {
 		return message.GoToProcessDetail{
 			PID:  pid,
-			Name: row[1],
+			Name: name,
 		}
 	}
 }
@@ -386,10 +408,13 @@ func (m *Model) modeColor() common.ColorMode {
 	}
 }
 
-func (m Model) handleSendSignalOpen() (Model, tea.Cmd) {
+func (m Model) handleSendSignalOpen(selectedProcessPID int, selectedProcessName string) (Model, tea.Cmd) {
 	if m.operationMode == lifecycle.ModeIdle {
 		return m, func() tea.Msg {
-			return lifecycle.SendSignalMsg{}
+			return lifecycle.SendSignalMsg{
+				ProcessPID:  selectedProcessPID,
+				ProcessName: selectedProcessName,
+			}
 		}
 	} else {
 		return m, func() tea.Msg {

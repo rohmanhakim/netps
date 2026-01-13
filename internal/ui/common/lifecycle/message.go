@@ -10,7 +10,10 @@ type UiStateMsg interface {
 	isUIState()
 }
 
-type SendSignalMsg struct{}
+type SendSignalMsg struct {
+	ProcessPID  int
+	ProcessName string
+}
 
 type CloseSendSignalModalMsg struct{}
 

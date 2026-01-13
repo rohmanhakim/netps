@@ -112,7 +112,7 @@ type Model struct {
 type styleFunc func(string) string
 
 func New(theme common.Theme, commandManager *command.Manager) (Model, error) {
-	sendSignal := sendsignal.New()
+	sendSignal := sendsignal.New(theme)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	err := commandManager.SetContext(command.ContextProcessListScreen)
@@ -267,6 +267,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	case lifecycle.SendSignalMsg:
 		m.operationMode = lifecycle.ModeSendSignal
+		m.sendSignalModalModel.SetProcessInfo(msg.ProcessPID, msg.ProcessName)
+		err := m.setCurrentCommandContext()
+		if err != nil {
+			log.Fatalf("[lifecycle.SendSignalMsg] Process Detail Model Error: %v", err)
+		}
 		viewportContentColorChanged = true // opening send signal modal changed the viewport's content color to dim which required to rerender the viewport
 	case lifecycle.CloseSendSignalModalMsg:
 		m.operationMode = lifecycle.ModeIdle
@@ -310,12 +315,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	if m.operationMode == lifecycle.ModeSendSignal {
 		m.sendSignalModalModel, cmd = m.sendSignalModalModel.Update(msg)
-		return m, cmd
 	} else {
 		m.viewportModel, cmd = m.viewportModel.Update(msg)
-		cmds = append(cmds, cmd)
-		return m, tea.Batch(cmds...)
 	}
+	cmds = append(cmds, cmd)
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) baseUIRenderableState() bool {
@@ -335,11 +339,9 @@ func (m Model) View() tea.View {
 
 		if m.operationMode == lifecycle.ModeSendSignal {
 			signalList := m.sendSignalModalModel
-			signalListWidth := lipgloss.Width(signalList.Modal)
-			signalListHeight := lipgloss.Height(signalList.Modal)
 			modalLayer := lipgloss.NewLayer(signalList.View().Content).
-				X((m.windowWidth / 2) - (signalListWidth / 2)).
-				Y((m.windowHeight / 2) - (signalListHeight / 2)).
+				X((m.windowWidth / 2) - (signalList.ModalWidth() / 2)).
+				Y((m.windowHeight / 2) - (signalList.ModalHeight() / 2)).
 				Z(1)
 			layers = append(layers, modalLayer)
 		}
@@ -423,7 +425,7 @@ func (m *Model) adjustViewportSize() {
 	case lifecycle.ModeIdle:
 		actionBar = common.ActionBar(m.windowWidth, m.commandManager.GenerateContextHelp())
 	case lifecycle.ModeSendSignal:
-		actionBar = common.ActionBar(m.windowWidth, m.sendSignalModalModel.SendSignalHelpItems)
+		actionBar = common.ActionBar(m.windowWidth, m.commandManager.GenerateContextHelp())
 	default:
 		actionBar = ""
 	}
@@ -577,7 +579,10 @@ func (m Model) handleS() (Model, tea.Cmd) {
 	// which is already have passed by process list screen (not from hydrating)
 	if m.operationMode == lifecycle.ModeIdle && m.computeScreenState() != StateInit {
 		return m, func() tea.Msg {
-			return lifecycle.SendSignalMsg{}
+			return lifecycle.SendSignalMsg{
+				ProcessPID:  m.PID,
+				ProcessName: m.ProcessName,
+			}
 		}
 	} else {
 		return m, func() tea.Msg {
