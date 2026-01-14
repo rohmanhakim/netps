@@ -19,3 +19,9 @@ type CloseSendSignalModalMsg struct{}
 
 func (SendSignalMsg) isUIState()           {}
 func (CloseSendSignalModalMsg) isUIState() {}
+
+type DismissnotificationMsg struct{}
+
+type RetryMsg struct{}
+
+func (DismissnotificationMsg) isUIState() {}

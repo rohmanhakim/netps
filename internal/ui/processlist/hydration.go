@@ -3,42 +3,26 @@ package processlist
 import (
 	"context"
 	"netps/internal/process"
-	"netps/internal/procfs"
-	"netps/internal/sysconf"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-func InitWindow(w, h int) tea.Cmd {
+func HydrateRunningProcesses(ctx context.Context, processService *process.Service) tea.Cmd {
 	return func() tea.Msg {
-		return initMsg{
-			Width:  w,
-			Height: h,
+		if ctx.Err() != nil {
+			return processSummariesHydratedMsg{err: ctx.Err()} // Propagate error
 		}
-	}
-}
 
-func HydrateRunningProcesses(ctx context.Context) tea.Cmd {
-	return func() tea.Msg {
-		procfsClient := procfs.NewClient()
-		sysconfClient := sysconf.NewClient()
+		processSummaries, err := processService.GetRunningSummaries(ctx)
 
-		cfg := process.Config{
-			Process:   procfsClient,
-			Detail:    procfsClient,
-			Clocktick: sysconfClient,
-			PageSize:  sysconfClient,
-			UpTime:    procfsClient,
-			Resource:  procfsClient,
-			User:      procfsClient,
+		msg := processSummariesHydratedMsg{}
+		if err == nil {
+			msg = processSummariesHydratedMsg{
+				processSummaries: processSummaries,
+			}
+		} else {
+			msg.err = err
 		}
-		service := process.NewProcessService(cfg)
-		processSummaries, err := service.GetRunningSummaries(ctx)
-		if err != nil {
-			return hydrationErrorMsg{Error: err}
-		}
-		return processSummariesLoadedMsg{
-			ProcessSummaries: processSummaries,
-		}
+		return msg
 	}
 }

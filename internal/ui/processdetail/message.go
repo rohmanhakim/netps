@@ -2,16 +2,8 @@ package processdetail
 
 import (
 	"netps/internal/socket"
+	"netps/internal/ui/common/lifecycle"
 	"time"
-)
-
-type HydrationState int
-
-const (
-	StateNotAsked HydrationState = iota
-	StateHydrating
-	StateSuccess
-	StateError
 )
 
 type StaticIdHydrationData struct {
@@ -19,7 +11,7 @@ type StaticIdHydrationData struct {
 	Command    string
 	PPID       int
 	ParentName string
-	state      HydrationState
+	state      lifecycle.HydrationState
 	err        error
 }
 
@@ -30,7 +22,7 @@ type ResourceHydrationData struct {
 	VSZByte     uint64
 	UTime       time.Duration
 	STime       time.Duration
-	state       HydrationState
+	state       lifecycle.HydrationState
 	err         error
 }
 
@@ -38,13 +30,13 @@ type UserHydrationData struct {
 	UserUID        int
 	UserName       string
 	UserPrivileged string
-	state          HydrationState
+	state          lifecycle.HydrationState
 	err            error
 }
 
 type SocketsHydrationData struct {
 	Sockets []socket.Socket
-	state   HydrationState
+	state   lifecycle.HydrationState
 	err     error
 }
 
@@ -85,14 +77,8 @@ type initMsg struct {
 	width, height int
 }
 
-type dismissnotificationMsg struct{}
-
-type retryMsg struct{}
-
 func (initMsg) isSideEffect()             {}
 func (staticIdHydratedMsg) isSideEffect() {}
 func (resourceHydratedMsg) isSideEffect() {}
 func (userHydratedMsg) isSideEffect()     {}
 func (socketsHydratedMsg) isSideEffect()  {}
-
-func (dismissnotificationMsg) isUIState() {}

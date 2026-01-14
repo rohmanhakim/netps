@@ -1,15 +1,22 @@
 package processlist
 
-import "netps/internal/process"
+import (
+	"netps/internal/process"
+	"netps/internal/ui/common/lifecycle"
+)
 
 type initMsg struct {
 	Width, Height int
 }
 
-type processSummariesLoadedMsg struct {
-	ProcessSummaries []process.ProcessSummary
+type processSummariesHydratedMsg struct {
+	processSummaries []process.ProcessSummary
+
+	err error
 }
 
-type hydrationErrorMsg struct {
-	Error error
+type processSummariesHydrationData struct {
+	processSummaries []process.ProcessSummary
+	state            lifecycle.HydrationState
+	err              error
 }

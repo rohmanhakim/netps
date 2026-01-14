@@ -29,12 +29,13 @@ const (
 )
 
 const (
-	ContextUnknown             Context = "UnknownContext"
-	ContextProcessListScreen   Context = "ProcessListScreen"
-	ContextProcessDetailScreen Context = "ProcessDetailScreen"
-	ContextHydrating           Context = "Hydrating"
-	ContextHydrationError      Context = "HydrationError"
-	ContextSendSignal          Context = "SendSignal"
+	ContextUnknown                  Context = "UnknownContext"
+	ContextProcessListScreen        Context = "ProcessListScreen"
+	ContextProcessDetailScreen      Context = "ProcessDetailScreen"
+	ContextHydrating                Context = "Hydrating"
+	ContextOperableHydrationError   Context = "OperableHydrationError"
+	ContextInoperableHydrationError Context = "InoperableHydrationError"
+	ContextSendSignal               Context = "SendSignal"
 )
 
 const (
