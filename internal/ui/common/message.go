@@ -1,4 +1,4 @@
-package lifecycle
+package common
 
 // Messages that represent side effects (block these on cancellation)
 type SideEffectMsg interface {

@@ -1,10 +1,13 @@
-// Invariants:
-// 1. This model hydrates exactly once.
-// 2. Table initialization happens on first WindowSizeMsg.
-// 3. Focus is forced after hydration to ensure width recalculation is rendered.
-// 4. This screen does not preserve selection across resizes.
-
 package processlist
+
+/* PROCESS LIST SCREEN
+ The screen that shows running processes as a list/table
+ Invariants:
+	1. This model hydrates exactly once.
+	2. Table initialization happens on first WindowSizeMsg.
+	3. Focus is forced after hydration to ensure width recalculation is rendered.
+	4. This screen does not preserve selection across resizes.
+*/
 
 import (
 	"context"
@@ -14,7 +17,8 @@ import (
 	"netps/internal/sysconf"
 	"netps/internal/ui/common"
 	"netps/internal/ui/common/command"
-	"netps/internal/ui/common/lifecycle"
+	"netps/internal/ui/common/hydration"
+
 	"netps/internal/ui/common/sendsignal"
 	"netps/internal/ui/message"
 	"strings"
@@ -30,6 +34,7 @@ import (
 
 const HorizontalPadding = 1
 const VerticalPadding = 2
+const FieldProcessSummaries = "processSummaries"
 
 type Model struct {
 	processSummaries []process.ProcessSummary
@@ -37,13 +42,12 @@ type Model struct {
 
 	sendSignalModalModel sendsignal.Model
 
-	processService *process.Service
-
-	processSumarriesHydration processSummariesHydrationData
+	processService       *process.Service
+	hydrationCoordinator *hydration.Coordinator
 
 	ctx                       context.Context
 	cancel                    context.CancelFunc
-	operationMode             lifecycle.Mode
+	operationMode             common.Mode
 	appTheme                  common.Theme
 	commandManager            *command.Manager
 	windowWidth, windowHeight int
@@ -79,14 +83,22 @@ func New(theme common.Theme, commandManager *command.Manager) (Model, error) {
 	}
 	processService := process.NewProcessService(cfg)
 
+	coordinator := hydration.NewCoordinator()
+	err = coordinator.Register(FieldProcessSummaries, hydration.RarityCommon, true, true)
+	if err != nil {
+		cancel()
+		return Model{}, err
+	}
+
 	return Model{
 		ctx:                  ctx,
 		cancel:               cancel,
 		appTheme:             theme,
-		operationMode:        lifecycle.ModeIdle,
+		operationMode:        common.ModeIdle,
 		commandManager:       commandManager,
 		sendSignalModalModel: sendSignal,
 		processService:       processService,
+		hydrationCoordinator: coordinator,
 	}, nil
 }
 
@@ -100,8 +112,8 @@ func (m Model) Init(width, height int) tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	if _, isSideEffect := msg.(lifecycle.SideEffectMsg); isSideEffect {
-		if lifecycle.ShouldCancelSideEffects(m.ctx) {
+	if _, isSideEffect := msg.(common.SideEffectMsg); isSideEffect {
+		if common.ShouldCancelSideEffects(m.ctx) {
 			return m, nil
 		}
 	}
@@ -119,36 +131,39 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case initMsg:
 		m.updateWindowSize(msg.Width, msg.Height)
 		m.updateTableSize() // need to update so that it recalculates table size after back from detail screen
+		m.hydrationCoordinator.HydrateAllFields()
 		m.sendSignalModalModel.Initialize()
 	case processSummariesHydratedMsg:
-		if msg.err == nil && m.processSummariesWouldChange(lifecycle.StateSuccess, msg.err) {
-			m.processSumarriesHydration.state = lifecycle.StateSuccess
-			m.processSumarriesHydration.err = nil
+		field, err := m.hydrationCoordinator.GetField(FieldProcessSummaries)
+		if err != nil {
+			log.Fatalf("Process List Screen error at processSummariesHydratedMsg: %v", err)
+		}
+		if msg.err == nil && field.WouldChange(hydration.StateSuccess, msg.err) {
+			field.SetSuccess()
 			m.updateTableRows(msg.processSummaries)
 			m.updateTableSize()
 			m.tableModel.SetCursor(0)
 			m.tableModel.Focus() // Safe to auto-focus: if not, the table won't update the screen with the new width from updateTableSize unless you resize the terminal
-		} else if m.processSummariesWouldChange(lifecycle.StateError, msg.err) {
-			m.processSumarriesHydration.state = lifecycle.StateError
-			m.processSumarriesHydration.err = msg.err
+		} else if msg.err != nil && field.WouldChange(hydration.StateError, msg.err) {
+			field.SetError(msg.err)
 			m.updateTableRows(msg.processSummaries)
 			m.updateTableSize()
 			m.tableModel.Focus() // Safe to auto-focus: if not, the table won't update the screen with the new width from updateTableSize unless you resize the terminal
 		}
-	case lifecycle.SendSignalMsg:
-		m.operationMode = lifecycle.ModeSendSignal
+	case common.SendSignalMsg:
+		m.operationMode = common.ModeSendSignal
 		m.sendSignalModalModel.SetProcessInfo(msg.ProcessPID, msg.ProcessName)
 		m.updateTableStyle()
 		err := m.setCurrentCommandContext()
 		if err != nil {
 			log.Fatalf("[lifecycle.SendSignalMsg] Process Detail Model Error: %v", err)
 		}
-	case lifecycle.CloseSendSignalModalMsg:
-		m.operationMode = lifecycle.ModeIdle
+	case common.CloseSendSignalModalMsg:
+		m.operationMode = common.ModeIdle
 		m.updateTableStyle()
-	case lifecycle.RetryMsg:
-		if m.operationMode == lifecycle.ModeSendSignal {
-			m.operationMode = lifecycle.ModeIdle
+	case common.RetryMsg:
+		if m.operationMode == common.ModeSendSignal {
+			m.operationMode = common.ModeIdle
 		}
 		m.resetContext()
 		commands := m.collectRetryCommands()
@@ -187,7 +202,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		log.Fatalf("[setCurrentCommandContext] Process Detail Model Error: %v", err)
 	}
 
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		m.sendSignalModalModel, cmd = m.sendSignalModalModel.Update(msg)
 		return m, cmd
 	} else {
@@ -197,14 +212,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
-	screenState := m.computeScreenState()
+	screenState := hydration.DeriveScreenPhase(m.hydrationCoordinator)
 	var v tea.View
 	v.AltScreen = true
 	switch screenState {
-	case lifecycle.StateInit:
+	case hydration.PhaseInit:
 		v.SetContent("\n  Initializing...")
 	default:
 		layers := []*lipgloss.Layer{}
+		completedHydration, totalHydration := m.hydrationCoordinator.GetHydrationProgress()
 		baseLayer := renderBaseLayer(
 			m.appTheme,
 			m.tableModel.View(),
@@ -213,13 +229,16 @@ func (m Model) View() tea.View {
 			m.modeColor(),
 			fmt.Sprintf("showing %d from %d processes", m.getShowingProcessCount(), len(m.processSummaries)),
 			m.commandManager.GenerateContextHelp(),
-			m.getErrorsAsString(),
+			m.hydrationCoordinator.GetErrorsAsString(),
 			screenState,
+			m.hydrationCoordinator.MandatorySucceeded(),
+			completedHydration,
+			totalHydration,
 			0,
 		)
 		layers = append(layers, baseLayer)
 
-		if m.operationMode == lifecycle.ModeSendSignal {
+		if m.operationMode == common.ModeSendSignal {
 			signalList := m.sendSignalModalModel
 			modalLayer := lipgloss.NewLayer(signalList.View().Content).
 				X((m.windowWidth / 2) - (signalList.ModalWidth() / 2)).
@@ -243,7 +262,10 @@ func renderBaseLayer(
 	statusBarInfo string,
 	helpItems []string,
 	errors []string,
-	screenState lifecycle.ScreenState,
+	screenState hydration.ScreenPhase,
+	mandatorySatisfied bool,
+	completedHydration int,
+	totalHydration int,
 	zIndex int,
 ) *lipgloss.Layer {
 	baseLayerComponents := []string{}
@@ -256,16 +278,18 @@ func renderBaseLayer(
 
 	var statusBar string
 	switch screenState {
-	case lifecycle.StateHydrationsInProgress, lifecycle.StateOneHydrationFinished:
-		statusBar = common.NotificationBar(theme, common.ColorModeNeutral, width, "Getting Data...")
-	case lifecycle.StateHydrationsFinishedErrorsExist:
-		statusBar = common.StatusBar(theme, width, modeName, colorMode, statusBarInfo, "", common.ColorModeWarning)
-		if len(errors) > 0 {
-			errorPanel := common.ErrorPanel(theme, width, errors)
-			baseLayerComponents = append(baseLayerComponents, errorPanel)
+	case hydration.PhaseHydrationsInProgress:
+		statusBar = common.NotificationBar(theme, common.ColorModeNeutral, width, fmt.Sprintf("Fetching incomplete data... [completed: %d/%d]", completedHydration, totalHydration))
+	case hydration.PhaseHydrationFinished:
+		if mandatorySatisfied {
+			statusBar = common.StatusBar(theme, width, modeName, colorMode, statusBarInfo, "", common.ColorModeSuccess)
+		} else {
+			statusBar = common.StatusBar(theme, width, modeName, colorMode, statusBarInfo, "", common.ColorModeWarning)
+			if len(errors) > 0 {
+				errorPanel := common.ErrorPanel(theme, width, errors)
+				baseLayerComponents = append(baseLayerComponents, errorPanel)
+			}
 		}
-	case lifecycle.StateHydrationsFinishedAllOK:
-		statusBar = common.StatusBar(theme, width, modeName, colorMode, statusBarInfo, "", common.ColorModeSuccess)
 	}
 
 	baseLayerComponents = append(baseLayerComponents, statusBar)
@@ -309,7 +333,7 @@ func (m *Model) updateWindowSize(w int, h int) {
 }
 
 func (m *Model) modeName() string {
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		return "Send Signal"
 	}
 	return "Process List"
@@ -323,17 +347,17 @@ func (m *Model) updateTableSize() {
 	newTableWidth := m.windowWidth - (HorizontalPadding * (len(m.tableModel.Columns()) - HorizontalPadding))
 	m.tableModel.SetWidth(newTableWidth)
 
-	errorPanel := common.ErrorPanel(m.appTheme, m.windowWidth, m.getErrorsAsString())
 	statusBar := common.StatusBar(m.appTheme, m.windowWidth, m.modeName(), m.modeColor(), m.processCount(), "", common.ColorModeNeutral)
 	actionBar := common.ActionBar(m.windowWidth, m.commandManager.GenerateContextHelp())
 	statusBarHeight := lipgloss.Height(statusBar)
 	actionBarHeight := lipgloss.Height(actionBar)
 
-	screenState := m.computeScreenState()
+	screenState := hydration.DeriveScreenPhase(m.hydrationCoordinator)
 	switch screenState {
-	case lifecycle.StateHydrationsFinishedErrorsExist:
-		errorsPanelHeight := lipgloss.Height(errorPanel)
-		if len(m.getErrorsAsString()) > 0 {
+	case hydration.PhaseHydrationFinished:
+		if m.hydrationCoordinator.ErrorsExist() {
+			errorPanel := common.ErrorPanel(m.appTheme, m.windowWidth, m.hydrationCoordinator.GetErrorsAsString())
+			errorsPanelHeight := lipgloss.Height(errorPanel)
 			m.tableModel.SetHeight(m.windowHeight - VerticalPadding - errorsPanelHeight - statusBarHeight - actionBarHeight)
 		} else {
 			m.tableModel.SetHeight(m.windowHeight - VerticalPadding - statusBarHeight - actionBarHeight)
@@ -379,7 +403,7 @@ func (m *Model) updateTableStyle() {
 		Bold(false)
 	s.Selected = s.Selected.
 		Bold(false)
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		s.Header = s.Header.BorderForeground(lipgloss.Color(m.appTheme.ColorInactive))
 		s.Selected = s.Selected.
 			Foreground(lipgloss.Color(m.appTheme.ColorForegroundSubtle)).
@@ -428,14 +452,16 @@ func (m Model) getShowingProcessCount() int {
 
 func (m *Model) setCurrentCommandContext() error {
 	var err error
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		err = m.commandManager.SetContext(command.ContextSendSignal)
 	} else {
-		switch m.computeScreenState() {
-		case lifecycle.StateHydrationsFinishedAllOK:
-			err = m.commandManager.SetContext(command.ContextProcessListScreen)
-		case lifecycle.StateHydrationsFinishedErrorsExist:
-			err = m.commandManager.SetContext(command.ContextInoperableHydrationError)
+		switch hydration.DeriveScreenPhase(m.hydrationCoordinator) {
+		case hydration.PhaseHydrationFinished:
+			if m.hydrationCoordinator.MandatorySucceeded() {
+				err = m.commandManager.SetContext(command.ContextProcessListScreen)
+			} else {
+				err = m.commandManager.SetContext(command.ContextInoperableHydrationError)
+			}
 		default:
 			err = m.commandManager.SetContext(command.ContextHydrating)
 		}
@@ -487,9 +513,9 @@ func registerContextualCommands(commandManager *command.Manager) error {
 }
 
 func (m Model) handleQuit() (Model, tea.Cmd) {
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		return m, func() tea.Msg {
-			return lifecycle.CloseSendSignalModalMsg{}
+			return common.CloseSendSignalModalMsg{}
 		}
 	} else {
 		return m, tea.Quit
@@ -531,7 +557,7 @@ func (m Model) handleInspect() (Model, tea.Cmd) {
 }
 
 func (m *Model) modeColor() common.ColorMode {
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		return common.ColorModeSpecial
 	} else {
 		return common.ColorModeNeutral
@@ -539,9 +565,9 @@ func (m *Model) modeColor() common.ColorMode {
 }
 
 func (m Model) handleSendSignalOpen(selectedProcessPID int, selectedProcessName string) (Model, tea.Cmd) {
-	if m.operationMode == lifecycle.ModeIdle {
+	if m.operationMode == common.ModeIdle {
 		return m, func() tea.Msg {
-			return lifecycle.SendSignalMsg{
+			return common.SendSignalMsg{
 				ProcessPID:  selectedProcessPID,
 				ProcessName: selectedProcessName,
 			}
@@ -554,9 +580,9 @@ func (m Model) handleSendSignalOpen(selectedProcessPID int, selectedProcessName 
 }
 
 func (m Model) handleBack() (Model, tea.Cmd) {
-	if m.operationMode == lifecycle.ModeSendSignal {
+	if m.operationMode == common.ModeSendSignal {
 		return m, func() tea.Msg {
-			return lifecycle.CloseSendSignalModalMsg{}
+			return common.CloseSendSignalModalMsg{}
 		}
 	} else {
 		return m, func() tea.Msg {
@@ -565,78 +591,16 @@ func (m Model) handleBack() (Model, tea.Cmd) {
 	}
 }
 
-func (m *Model) getErrorsAsString() []string {
-	errorStrings := []string{}
-	if m.processSumarriesHydration.state == lifecycle.StateError && m.processSumarriesHydration.err != nil {
-		errorStrings = append(errorStrings, "[retryable] "+m.processSumarriesHydration.err.Error())
-	}
-	return errorStrings
-}
-
-func (m *Model) processSummariesWouldChange(newState lifecycle.HydrationState, err error) bool {
-	oldState := m.processSumarriesHydration.state
-	oldError := m.processSumarriesHydration.err
-	return oldState != newState || oldError != err
-}
-
-func (m *Model) hydrationErrorsExist() bool {
-	return m.processSumarriesHydration.err != nil
-}
-
-func (m *Model) allHydrationFinished() bool {
-	processSummariesHydrationFinished := m.processSumarriesHydration.state == lifecycle.StateSuccess || m.processSumarriesHydration.state == lifecycle.StateError
-
-	return processSummariesHydrationFinished
-}
-
-func (m *Model) allHydrationOK() bool {
-	allHydrationOK := m.processSumarriesHydration.state == lifecycle.StateSuccess
-	return allHydrationOK
-}
-
-func (m *Model) oneHydrationFinished() bool {
-	processSummariesHydrationFinished := m.processSumarriesHydration.state == lifecycle.StateSuccess || m.processSumarriesHydration.state == lifecycle.StateError
-
-	return processSummariesHydrationFinished
-}
-
-func (m *Model) allHydrating() bool {
-	return m.processSumarriesHydration.state == lifecycle.StateHydrating
-}
-
-// Calculate the current screen's state
-// Central place to derive screen's state
-// Pure state rducer so that no multiple state mutations inside this screen
-// Multiple subsystems query computeScreenState() in other place is intentional for now
-// TO-DO: State caching
-func (m *Model) computeScreenState() lifecycle.ScreenState {
-	if m.allHydrationFinished() {
-		if m.allHydrationOK() {
-			return lifecycle.StateHydrationsFinishedAllOK
-		} else {
-			return lifecycle.StateHydrationsFinishedErrorsExist
-		}
-	} else {
-		if m.oneHydrationFinished() {
-			return lifecycle.StateOneHydrationFinished
-		} else if m.allHydrating() {
-			return lifecycle.StateHydrationsInProgress
-		} else {
-			return lifecycle.StateInit
-		}
-	}
-}
-
 func (m Model) handleErrorRetry() (Model, tea.Cmd) {
-	switch m.computeScreenState() {
-	case lifecycle.StateHydrationsFinishedErrorsExist:
-		if m.operationMode == lifecycle.ModeSendSignal {
+	switch hydration.DeriveScreenPhase(m.hydrationCoordinator) {
+	case hydration.PhaseHydrationFinished:
+		if m.operationMode == common.ModeSendSignal {
 			return m, func() tea.Msg {
 				return nil // when mode is send signal, user should not have access to retry error
 			}
-		} else if m.hydrationErrorsExist() {
+		} else if m.hydrationCoordinator.ErrorsExist() {
 			return m, func() tea.Msg {
-				return lifecycle.RetryMsg{}
+				return common.RetryMsg{}
 			}
 		} else {
 			return m, func() tea.Msg {
@@ -659,16 +623,16 @@ func (m *Model) resetContext() {
 
 func (m *Model) collectRetryCommands() []tea.Cmd {
 	commands := []tea.Cmd{}
+	retryMap := map[string]tea.Cmd{
+		FieldProcessSummaries: HydrateRunningProcesses(m.ctx, m.processService),
+	}
 
-	if m.shouldRetry(m.processSumarriesHydration.err) {
-		m.processSumarriesHydration.err = nil
-		m.processSumarriesHydration.state = lifecycle.StateHydrating
-		commands = append(commands, HydrateRunningProcesses(m.ctx, m.processService))
+	for _, fieldName := range m.hydrationCoordinator.GetFieldsForRetry() {
+		m.hydrationCoordinator.HydrateField(fieldName)
+		if cmd, ok := retryMap[fieldName]; ok {
+			commands = append(commands, cmd)
+		}
 	}
 
 	return commands
-}
-
-func (m *Model) shouldRetry(err error) bool {
-	return err != nil
 }

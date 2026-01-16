@@ -2,42 +2,33 @@ package processdetail
 
 import (
 	"netps/internal/socket"
-	"netps/internal/ui/common/lifecycle"
 	"time"
 )
 
-type StaticIdHydrationData struct {
+type StaticIdData struct {
 	ExecPath   string
 	Command    string
 	PPID       int
 	ParentName string
-	state      lifecycle.HydrationState
-	err        error
 }
 
-type ResourceHydrationData struct {
+type ResourceData struct {
 	RSSByte     int64
 	StartTime   time.Duration
 	ElapsedTime time.Duration
 	VSZByte     uint64
 	UTime       time.Duration
 	STime       time.Duration
-	state       lifecycle.HydrationState
-	err         error
 }
 
-type UserHydrationData struct {
+type UserData struct {
 	UserUID        int
 	UserName       string
 	UserPrivileged string
-	state          lifecycle.HydrationState
-	err            error
 }
 
-type SocketsHydrationData struct {
+type SocketsData struct {
 	Sockets []socket.Socket
-	state   lifecycle.HydrationState
-	err     error
 }
 
 type staticIdHydratedMsg struct {
